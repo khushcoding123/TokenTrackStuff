@@ -5,9 +5,9 @@ having to re-explain the project each session.
 
 ## What this is
 
-**TokenPilot** — a terminal-first AI assistant for "vibecoders." It sits between
+**metriq** — a terminal-first AI assistant for "vibecoders." It sits between
 a developer and their AI coding tool (Claude Code, Cursor, Codex, Gemini CLI,
-etc.). Before a prompt is sent, TokenPilot analyzes it, flags whether it's too
+etc.). Before a prompt is sent, metriq analyzes it, flags whether it's too
 broad, estimates its token cost, and rewrites vague prompts into focused ones
 that keep the AI on the right files instead of searching the whole codebase.
 
@@ -17,15 +17,20 @@ This repo contains two deliverables:
 
 | Path | What it is |
 | --- | --- |
-| `bin/`, `src/`, `test/` | The **CLI** — published to npm as `@kkothari/tokenpilot` |
+| `bin/`, `src/`, `test/` | The **CLI** — published to npm as `metriq` |
 | `web/` | The **landing page** — Next.js 14, deployed to Vercel |
 
 ## Live locations
 
-- **npm:** https://www.npmjs.com/package/@kkothari/tokenpilot (`@kkothari/tokenpilot`)
+- **npm:** https://www.npmjs.com/package/metriq (`metriq`)
 - **Landing page:** https://tokenpilot-mocha.vercel.app
 - **GitHub:** https://github.com/khushcoding123/TokenTrackStuff
 - **Vercel project:** `tokenpilot` (team `khush-kotharis-projects`), root directory `web`, auto-deploys on push to `main`.
+
+Note: the repo, GitHub URL, Vercel project, and `bin/tokenpilot.js` filename
+still carry the old "tokenpilot" name — only the product branding (package
+name, CLI command, page copy) was renamed to metriq. Don't "fix" these to
+match; they're intentionally unchanged infrastructure identifiers.
 
 ## Hard rules / conventions
 
@@ -65,10 +70,10 @@ with `session` recording results.
 - `src/core/rewrite.js` — turns analysis + scanned files into a focused prompt:
   intent → starting point → scope guard → report-back. `optimize()` is the
   convenience entry that analyzes, rewrites, and computes savings.
-- `src/core/session.js` — local session log at `~/.tokenpilot/session.json`
+- `src/core/session.js` — local session log at `~/.metriq/session.json`
   (best-effort; never blocks the user). Powers `stats`/`history`.
 - `src/ui/colors.js` — hand-rolled ANSI colors; auto-disabled when not a TTY or
-  when `NO_COLOR`/`TOKENPILOT_NO_COLOR` is set.
+  when `NO_COLOR`/`TOKENPILOT_NO_COLOR` is set (env var name kept as-is, unrenamed).
 - `src/ui/format.js` — renders the analysis report, bars, boxes, stats tables.
 - `src/commands/` — `analyze.js`, `start.js` (interactive REPL — the primary UX),
   `stats.js` (also `history`, `reset`).
@@ -96,16 +101,52 @@ git push origin main                    # web → Vercel auto-deploys
 
 ## Web app (`web/`)
 
-- Next.js 14 App Router, plain JS (no TypeScript), single marketing page.
-- `web/app/page.js` — all sections (hero, stats, before/after demo, how-it-works,
-  features, tools, pricing, footer).
-- `web/app/InstallCommand.js` + `web/app/BeforeAfter.js` — the only client
-  components (copy button; before/after terminal toggle).
-- `web/app/globals.css` — all styling; dark developer aesthetic, cyan/green
-  palette matching the CLI. Design tokens are CSS vars in `:root`.
-- **Note:** the Pro/Team pricing tiers and their features (cloud dashboard,
-  AI rewrites, sync) are aspirational copy from the product vision — they are
-  NOT built yet. Don't describe them as shipped.
+- Next.js 14 App Router, plain JS (no TypeScript), **multi-page dashboard app**
+  (not a single marketing page — this replaced the old landing page).
+- Styled with real Tailwind CSS (build-time, via `tailwind.config.js` +
+  `postcss.config.js` + `@tailwind` directives in `globals.css` — not the
+  Tailwind CDN `<script>` some prototypes use). Dark-only theme (`<html
+  className="dark">`), glass-card aesthetic, green/blue accent palette, Geist /
+  Inter / JetBrains Mono fonts loaded via `<link>` tags in `layout.js` (Next.js
+  hoists them into `<head>` automatically), Material Symbols Outlined for icons.
+- Routes: `/` (Overview — hero, headline metrics, compression chart, live log
+  feed), `/prompt-studio` (real prompt analysis — see below), `/sessions`
+  (searchable/filterable/paginated session history with CSV export and a logs
+  modal), `/sustainability` (environmental-impact metric cards, pipeline
+  diagram, optimization log table with CSV export), `/settings` (persisted
+  preferences).
+- `web/app/components/Sidebar.js` + `TopBar.js` — shared nav shell used by every
+  page. `Sidebar` takes an `active` prop to highlight the current route
+  (including `/settings`, which lives in the footer group). `TopBar` is a
+  client component with a working notifications dropdown, a "local-only"
+  status popover, and a profile menu.
+- `web/app/components/ToastProvider.js` — wraps the whole app in `layout.js`;
+  `useToast()` gives any client component a `notify(message)` snackbar.
+- **`/prompt-studio` runs the real CLI engine, not mock data.**
+  `PromptStudioClient.js` imports `analyzePrompt`/`optimize` directly from
+  `../../../src/core/analyzer.js` / `rewrite.js` (and pricing from
+  `src/config.js`) — those modules are pure JS with no Node built-ins, so they
+  run fine in the browser. Typing in the editor live-recomputes breadth score,
+  token savings, and reasoning; the magic-wand button actually calls
+  `optimize()` and replaces the prompt text; "Run Evaluation" snapshots a
+  revision history you can restore from. If you change scoring in
+  `analyzer.js`, this page's numbers change too — same source of truth as the
+  CLI and `test/core.test.js`.
+- **Sessions, Sustainability, and Overview still use static/hard-coded mock
+  data** (no backend, no wiring to the CLI's real `~/.metriq/session.json`) —
+  but the interactions around that data (search, project filter, pagination,
+  CSV export via `web/app/lib/csv.js`, per-row log modal, copy-to-clipboard)
+  are fully functional, they just operate on illustrative rows, not real
+  session history. Don't present the numbers themselves as live data.
+- `/settings` persists to `localStorage` (`metriq:provider`,
+  `metriq:reducedMotion`) — no account/backend. The pricing-provider choice
+  is read by Prompt Studio's $-savings estimate; reduced-motion sets
+  `data-reduced-motion` on `<html>`, which `globals.css` uses to kill
+  animations/transitions site-wide.
+- Avatars are plain icon-in-circle divs, not `<img>` tags — earlier drafts
+  hotlinked AI-generated placeholder images from a Google-hosted preview
+  bucket; those were deliberately replaced since we don't control that URL's
+  lifetime.
 
 ## Deployment gotcha (important)
 
@@ -119,7 +160,7 @@ If a deploy comes back BLOCKED, check the commit author email first.
 Per the product vision, these are planned but absent: browser auth
 (GitHub/Google) + terminal↔account linking, dashboard + web analytics, session
 sync backend, optional AI-powered rewrites (hybrid: heuristics for detection, an
-LLM call via the Vercel AI Gateway for the rewrite), and `npx tokenpilot install`.
+LLM call via the Vercel AI Gateway for the rewrite), and `npx metriq install`.
 
 ## Working preferences
 
