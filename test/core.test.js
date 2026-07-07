@@ -1,11 +1,28 @@
-// Unit tests for the TokenPilot analysis core. Run with: npm test
+// Unit tests for the metriq analysis core. Run with: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { estimateTokens } from "../src/core/tokenizer.js";
 import { analyzePrompt, ratingFor } from "../src/core/analyzer.js";
 import { optimize, buildFocusedPrompt } from "../src/core/rewrite.js";
-import { keywordsFromPrompt } from "../src/core/scanner.js";
+import { keywordsFromPrompt, scanProjectContext } from "../src/core/scanner.js";
+
+function withTempProject(files, fn) {
+  const dir = mkdtempSync(join(tmpdir(), "metriq-test-"));
+  try {
+    for (const [file, content] of Object.entries(files)) {
+      const full = join(dir, file);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, content, "utf8");
+    }
+    return fn(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 test("estimateTokens: empty and non-empty", () => {
   assert.equal(estimateTokens(""), 0);
@@ -73,10 +90,56 @@ test("optimize: broad prompt yields positive savings and a rewrite", () => {
 test("buildFocusedPrompt: uses scanned files when provided", () => {
   const a = analyzePrompt("fix the dashboard bug");
   const { text } = buildFocusedPrompt(a, {
-    relevantFiles: ["src/Dashboard.tsx", "src/usageApi.ts"],
+    projectContext: {
+      files: ["src/Dashboard.tsx", "src/usageApi.ts"],
+      confidence: "high",
+      subsystem: "dashboard",
+    },
   });
   assert.match(text, /`src\/Dashboard\.tsx`/);
   assert.match(text, /`src\/usageApi\.ts`/);
+  assert.match(text, /dashboard flow/i);
+});
+
+test("buildFocusedPrompt: asks for another clue on low-confidence scan", () => {
+  const a = analyzePrompt("fix the dashboard bug");
+  const { text } = buildFocusedPrompt(a, {
+    projectContext: { files: [], confidence: "low", subsystem: "" },
+  });
+  assert.match(text, /couldn't confidently identify/i);
+});
+
+test("scanProjectContext: ranks likely ownership files using content and path", () => {
+  withTempProject(
+    {
+      "src/dashboard/DashboardPage.tsx":
+        "export function DashboardPage() { return <div>Token usage bug</div>; }",
+      "src/dashboard/tokenUsage.ts":
+        "export function calculateTokenUsage() { return 0; }",
+      "src/auth/login.ts": "export function login() { return true; }",
+    },
+    (dir) => {
+      const context = scanProjectContext("Fix the dashboard token bug", dir);
+      assert.equal(context.confidence, "high");
+      assert.ok(context.files.includes("src/dashboard/DashboardPage.tsx"));
+      assert.ok(context.files.includes("src/dashboard/tokenUsage.ts"));
+      assert.equal(context.subsystem, "dashboard");
+    }
+  );
+});
+
+test("scanProjectContext: returns low confidence when nothing matches", () => {
+  withTempProject(
+    {
+      "src/auth/login.ts": "export function login() { return true; }",
+      "src/api/user.ts": "export async function fetchUser() { return null; }",
+    },
+    (dir) => {
+      const context = scanProjectContext("Fix the dashboard chart bug", dir);
+      assert.equal(context.confidence, "low");
+      assert.deepEqual(context.files, []);
+    }
+  );
 });
 
 test("keywordsFromPrompt: drops stopwords and short tokens", () => {

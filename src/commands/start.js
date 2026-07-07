@@ -9,7 +9,7 @@
 
 import readline from "node:readline";
 import { optimize } from "../core/rewrite.js";
-import { findRelevantFiles } from "../core/scanner.js";
+import { scanProjectContext } from "../core/scanner.js";
 import { renderAnalysis, banner, num, money } from "../ui/format.js";
 import { colors } from "../ui/colors.js";
 import { load, record, summarize } from "../core/session.js";
@@ -70,14 +70,16 @@ export function runStart(flags = {}) {
     }
 
     // Analyze the prompt.
-    const relevantFiles =
-      flags.scan === false ? [] : findRelevantFiles(input, process.cwd());
-    const result = optimize(input, { relevantFiles, history });
+    const projectContext =
+      flags.scan === false
+        ? { files: [], candidates: [], confidence: "low", subsystem: "" }
+        : scanProjectContext(input, process.cwd());
+    const result = optimize(input, { projectContext, history });
 
     console.log(
       renderAnalysis(result.analysis, {
         optimize: result,
-        relevantFiles,
+        projectContext,
         provider,
       })
     );

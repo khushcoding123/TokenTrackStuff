@@ -50,8 +50,9 @@ function rule(char = "─", width = 60) {
 
 // The full analysis report for a single prompt.
 export function renderAnalysis(result, opts = {}) {
-  const { optimize, relevantFiles = [], provider } = opts;
+  const { optimize, projectContext = {}, provider } = opts;
   const a = result;
+  const relevantFiles = projectContext.files || [];
   const style = RATING_STYLE[a.rating] || RATING_STYLE.moderate;
   const out = [];
 
@@ -87,8 +88,16 @@ export function renderAnalysis(result, opts = {}) {
   // Relevant files (from scan) shown when we have them and the prompt lacked refs.
   if (relevantFiles.length && !a.hasFileRef) {
     out.push("");
-    out.push(colors.bold("  Files"));
-    for (const f of relevantFiles) out.push(`  ${colors.magenta("▫")} ${f}`);
+    const confidence = projectContext.confidence
+      ? ` ${colors.gray(`(${projectContext.confidence})`)}`
+      : "";
+    out.push(colors.bold("  Files") + confidence);
+    for (const candidate of (projectContext.candidates || []).slice(0, 3)) {
+      const reason = candidate.reasons?.[0]
+        ? colors.gray(` — ${candidate.reasons[0]}`)
+        : "";
+      out.push(`  ${colors.magenta("▫")} ${candidate.file}${reason}`);
+    }
   }
 
   // Optimized rewrite — only worth showing when it meaningfully helps.

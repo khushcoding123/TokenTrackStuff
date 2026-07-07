@@ -3,7 +3,7 @@
 // scan.
 
 import { optimize } from "../core/rewrite.js";
-import { findRelevantFiles } from "../core/scanner.js";
+import { scanProjectContext } from "../core/scanner.js";
 import { renderAnalysis, banner } from "../ui/format.js";
 import { colors } from "../ui/colors.js";
 import { record } from "../core/session.js";
@@ -19,10 +19,12 @@ export function runAnalyze(prompt, flags = {}) {
   }
 
   const provider = flags.provider || DEFAULT_PROVIDER;
-  const relevantFiles =
-    flags.scan === false ? [] : findRelevantFiles(prompt, process.cwd());
+  const projectContext =
+    flags.scan === false
+      ? { files: [], candidates: [], confidence: "low", subsystem: "" }
+      : scanProjectContext(prompt, process.cwd());
 
-  const result = optimize(prompt, { relevantFiles });
+  const result = optimize(prompt, { projectContext });
 
   if (flags.json) {
     console.log(
@@ -35,7 +37,9 @@ export function runAnalyze(prompt, flags = {}) {
           promptTokens: result.analysis.promptTokens,
           explorationTokens: result.analysis.explorationTokens,
           issues: result.analysis.issues,
-          relevantFiles,
+          relevantFiles: projectContext.files,
+          confidence: projectContext.confidence,
+          candidates: projectContext.candidates,
           suggestion: result.focused.text,
           optimizedTokens: result.rewrittenAnalysis.projectedTokens,
           savedTokens: result.savedTokens,
@@ -50,7 +54,7 @@ export function runAnalyze(prompt, flags = {}) {
     console.log(
       renderAnalysis(result.analysis, {
         optimize: result,
-        relevantFiles,
+        projectContext,
         provider,
       })
     );
