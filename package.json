@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node bin/tokenpilot.js start",
     "analyze": "node bin/tokenpilot.js analyze",
-    "test": "node --test"
+    "test": "node --test",
+    "dev": "npm --prefix web run dev"
   },
   "engines": {
     "node": ">=18"
