@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function InstallCommand({
-  command = "npx @kkothari/tokenpilot@latest start",
+  command = "npx metriq@latest start",
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -22,7 +22,7 @@ export default function InstallCommand({
     <div className="install" role="group" aria-label="Install command">
       <span className="prompt">$</span>
       <span className="cmd">
-        npx <span className="hl">@kkothari/tokenpilot@latest</span> start
+        npx <span className="hl">metriq@latest</span> start
       </span>
       <button
         className={`copy-btn${copied ? " copied" : ""}`}

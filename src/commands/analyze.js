@@ -1,4 +1,4 @@
-// `tokenpilot analyze "<prompt>"` — analyze one prompt and suggest a focused
+// `metriq analyze "<prompt>"` — analyze one prompt and suggest a focused
 // rewrite. Supports --json for programmatic use and --no-scan to skip the disk
 // scan.
 
@@ -13,7 +13,7 @@ export function runAnalyze(prompt, flags = {}) {
   if (!prompt || !prompt.trim()) {
     console.error(
       colors.red("No prompt provided.") +
-        '  Usage: tokenpilot analyze "your prompt here"'
+        '  Usage: metriq analyze "your prompt here"'
     );
     return 1;
   }

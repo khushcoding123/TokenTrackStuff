@@ -1,4 +1,4 @@
-// Central configuration and pricing model for TokenPilot.
+// Central configuration and pricing model for metriq.
 // Prices are blended $ per 1M tokens (input + output averaged) and are only
 // used to turn token estimates into rough dollar figures. They are deliberately
 // approximate — the point is relative savings, not billing accuracy.

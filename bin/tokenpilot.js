@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// TokenPilot CLI entry point.
+// metriq CLI entry point.
 import { run } from "../src/cli.js";
 
 const code = run();

@@ -1,4 +1,4 @@
-// Argument parsing and command dispatch for the `tokenpilot` CLI.
+// Argument parsing and command dispatch for the `metriq` CLI.
 
 import { runAnalyze } from "./commands/analyze.js";
 import { runStart } from "./commands/start.js";
@@ -39,7 +39,7 @@ function printHelp() {
 ${banner()}
 
 ${c.bold("USAGE")}
-  tokenpilot <command> [options]
+  metriq <command> [options]
 
 ${c.bold("COMMANDS")}
   ${c.cyan("start")}                 Launch the interactive terminal companion (REPL)
@@ -60,10 +60,10 @@ ${c.bold("OPTIONS")}
   ${c.gray("--version")}             Print version
 
 ${c.bold("EXAMPLES")}
-  ${c.gray("$")} tokenpilot analyze ${c.gray('"Fix the dashboard bug"')}
-  ${c.gray("$")} tokenpilot analyze ${c.gray('"add auth"')} --provider claude-opus
-  ${c.gray("$")} tokenpilot start
-  ${c.gray("$")} tokenpilot stats
+  ${c.gray("$")} metriq analyze ${c.gray('"Fix the dashboard bug"')}
+  ${c.gray("$")} metriq analyze ${c.gray('"add auth"')} --provider claude-opus
+  ${c.gray("$")} metriq start
+  ${c.gray("$")} metriq stats
 `);
 }
 
@@ -71,7 +71,7 @@ export function run(argv = process.argv.slice(2)) {
   const { flags, positionals } = parseArgs(argv);
 
   if (flags.version) {
-    console.log(`tokenpilot ${VERSION}`);
+    console.log(`metriq ${VERSION}`);
     return 0;
   }
 
@@ -97,7 +97,7 @@ export function run(argv = process.argv.slice(2)) {
       console.error(
         colors.red(`Unknown command: ${command}`) +
           "\n  Run " +
-          colors.cyan("tokenpilot help") +
+          colors.cyan("metriq help") +
           " to see available commands."
       );
       return 1;

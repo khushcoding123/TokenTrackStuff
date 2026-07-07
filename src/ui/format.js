@@ -1,4 +1,4 @@
-// Terminal rendering for TokenPilot. Boxes, bars, and the analysis report.
+// Terminal rendering for metriq. Boxes, bars, and the analysis report.
 
 import { colors, severityColor } from "./colors.js";
 import { dollarsFor } from "../config.js";
@@ -112,6 +112,6 @@ export function renderAnalysis(result, opts = {}) {
 }
 
 export function banner() {
-  const name = colors.cyan(colors.bold("TokenPilot"));
+  const name = colors.cyan(colors.bold("metriq"));
   return `${name} ${colors.gray("— prompt focus")}`;
 }

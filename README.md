@@ -1,8 +1,8 @@
-# TokenPilot
+# metriq
 
-**Live demo:** https://tokenpilot-mocha.vercel.app · **npm:** [`@kkothari/tokenpilot`](https://www.npmjs.com/package/@kkothari/tokenpilot)
+**Live demo:** https://tokenpilot-mocha.vercel.app · **npm:** [`metriq`](https://www.npmjs.com/package/metriq)
 
-**Terminal-first AI assistant for vibecoders.** TokenPilot sits between you and
+**Terminal-first AI assistant for vibecoders.** metriq sits between you and
 your AI coding tool (Claude Code, Cursor, Codex, Gemini CLI, …). Before a prompt
 is sent, it estimates how expensive the prompt will be, flags whether it's too
 broad, and rewrites it into a focused version that keeps the AI working on the
@@ -23,11 +23,11 @@ No install needed to try it (zero runtime dependencies, Node ≥ 18):
 node bin/tokenpilot.js analyze "Fix the dashboard bug"
 ```
 
-Or link it globally so `tokenpilot` is on your PATH:
+Or link it globally so `metriq` is on your PATH:
 
 ```bash
 npm link          # from this directory
-tokenpilot start
+metriq start
 ```
 
 ---
@@ -35,7 +35,7 @@ tokenpilot start
 ## What you get
 
 ```
-$ tokenpilot analyze "Fix the dashboard bug related to token usage"
+$ metriq analyze "Fix the dashboard bug related to token usage"
 
 ⚠ BROAD  breadth 68/100
   ████████████████░░░░░░░░
@@ -67,12 +67,12 @@ $ tokenpilot analyze "Fix the dashboard bug related to token usage"
 
 | Command | What it does |
 | --- | --- |
-| `tokenpilot start` | Interactive REPL — analyzes every prompt before you send it, tracks running savings. The primary experience. |
-| `tokenpilot analyze "<prompt>"` | Analyze one prompt and print a focused rewrite. |
-| `tokenpilot stats` | Session analytics: tokens projected, saved, $ saved, most expensive prompts. |
-| `tokenpilot history` | Every prompt analyzed this session. |
-| `tokenpilot reset` | Start a fresh session. |
-| `tokenpilot help` | Full help. |
+| `metriq start` | Interactive REPL — analyzes every prompt before you send it, tracks running savings. The primary experience. |
+| `metriq analyze "<prompt>"` | Analyze one prompt and print a focused rewrite. |
+| `metriq stats` | Session analytics: tokens projected, saved, $ saved, most expensive prompts. |
+| `metriq history` | Every prompt analyzed this session. |
+| `metriq reset` | Start a fresh session. |
+| `metriq help` | Full help. |
 
 ### Options
 
@@ -103,7 +103,7 @@ Everything is local, deterministic, and dependency-free.
   names/paths match your prompt keywords, so rewrites can name real files.
 - **`src/core/rewrite.js`** — turns intent + missing pieces into a focused
   prompt: original intent → concrete starting point → scope guard → report-back.
-- **`src/core/session.js`** — local session log at `~/.tokenpilot/session.json`.
+- **`src/core/session.js`** — local session log at `~/.metriq/session.json`.
 
 ---
 
@@ -115,7 +115,7 @@ The MVP CLI is here. Still to come, per the product vision:
 - Dashboard sync + web analytics
 - Optional AI-powered rewrites (hybrid: heuristics for detection, an LLM call
   for the rewrite) via the Vercel AI Gateway
-- Landing page and `npx tokenpilot install`
+- Landing page and `npx metriq install`
 
 ---
 

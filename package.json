@@ -1,10 +1,10 @@
 {
-  "name": "@kkothari/tokenpilot",
+  "name": "metriq",
   "version": "0.1.0",
   "description": "Terminal-first AI assistant that analyzes coding prompts before they reach AI tools, flags broad prompts, estimates token cost, and rewrites vague prompts into focused ones.",
   "type": "module",
   "bin": {
-    "tokenpilot": "bin/tokenpilot.js"
+    "metriq": "bin/tokenpilot.js"
   },
   "scripts": {
     "start": "node bin/tokenpilot.js start",

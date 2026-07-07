@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-// A faithful recreation of real `tokenpilot analyze` output for the flagship
+// A faithful recreation of real `metriq analyze` output for the flagship
 // example, toggled between the vague prompt and the focused rewrite.
 export default function BeforeAfter() {
   const [tab, setTab] = useState("before");
@@ -25,7 +25,7 @@ export default function BeforeAfter() {
             className={tab === "after" ? "active good" : ""}
             onClick={() => setTab("after")}
           >
-            TokenPilot rewrite
+            metriq rewrite
           </button>
         </div>
       </div>
@@ -35,7 +35,7 @@ export default function BeforeAfter() {
           <span className="term-dot r" />
           <span className="term-dot y" />
           <span className="term-dot g" />
-          <span className="term-title">tokenpilot analyze</span>
+          <span className="term-title">metriq analyze</span>
         </div>
         <div className="term-body">
           {tab === "before" ? <Before /> : <After />}
@@ -54,7 +54,7 @@ function Before() {
     <>
       <L>
         <span className="c-dim">$ </span>
-        <span className="c-white">tokenpilot analyze </span>
+        <span className="c-white">metriq analyze </span>
         <span className="c-yellow">&quot;Fix the dashboard bug&quot;</span>
       </L>
       <L>{" "}</L>

@@ -1,7 +1,7 @@
 // Local session tracking.
 //
-// TokenPilot keeps a lightweight record of the prompts analyzed this session in
-// a JSON file under the user's home directory. This powers `tokenpilot stats`
+// metriq keeps a lightweight record of the prompts analyzed this session in
+// a JSON file under the user's home directory. This powers `metriq stats`
 // and, later, dashboard sync. Everything is local and append-only within a
 // session; `reset` starts a fresh one.
 
@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { dollarsFor, DEFAULT_PROVIDER } from "../config.js";
 
-const DIR = join(homedir(), ".tokenpilot");
+const DIR = join(homedir(), ".metriq");
 const FILE = join(DIR, "session.json");
 
 function emptySession() {

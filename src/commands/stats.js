@@ -1,6 +1,6 @@
-// `tokenpilot stats` — session analytics summary.
-// `tokenpilot history` — the full prompt log.
-// `tokenpilot reset` — start a fresh session.
+// `metriq stats` — session analytics summary.
+// `metriq history` — the full prompt log.
+// `metriq reset` — start a fresh session.
 
 import { load, summarize, reset as resetSession, SESSION_FILE } from "../core/session.js";
 import { colors } from "../ui/colors.js";
@@ -22,7 +22,7 @@ export function runStats(flags = {}) {
   if (s.total === 0) {
     console.log(
       colors.gray(
-        "\n  No prompts tracked yet. Run `tokenpilot start` or `tokenpilot analyze \"…\"`.\n"
+        "\n  No prompts tracked yet. Run `metriq start` or `metriq analyze \"…\"`.\n"
       )
     );
     return 0;

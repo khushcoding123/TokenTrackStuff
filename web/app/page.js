@@ -1,7 +1,7 @@
 import InstallCommand from "./InstallCommand";
 import BeforeAfter from "./BeforeAfter";
 
-const NPM_URL = "https://www.npmjs.com/package/@kkothari/tokenpilot";
+const NPM_URL = "https://www.npmjs.com/package/metriq";
 
 export default function Home() {
   return (
@@ -11,7 +11,7 @@ export default function Home() {
         <div className="container nav-inner">
           <a className="brand" href="#top">
             <span className="brand-mark">›</span>
-            <span>TokenPilot</span>
+            <span>metriq</span>
           </a>
           <div className="nav-links">
             <a href="#how">How it works</a>
@@ -40,7 +40,7 @@ export default function Home() {
             <span className="accent">Save your tokens.</span>
           </h1>
           <p className="sub">
-            TokenPilot is a terminal-first AI assistant that analyzes your
+            metriq is a terminal-first AI assistant that analyzes your
             coding prompts <em>before</em> they reach Cursor or Claude Code —
             flagging broad prompts, estimating token cost, and rewriting vague
             asks into focused ones.
@@ -50,7 +50,7 @@ export default function Home() {
           </div>
           <p className="hero-note">
             Requires Node 18+. Or install globally:{" "}
-            <code>npm i -g @kkothari/tokenpilot</code>
+            <code>npm i -g metriq</code>
           </p>
         </div>
       </header>
@@ -85,7 +85,7 @@ export default function Home() {
             <h2>One vague prompt. One focused rewrite.</h2>
             <p>
               Broad prompts make your AI search the whole codebase and burn
-              context. TokenPilot rewrites them to point at the exact files —
+              context. metriq rewrites them to point at the exact files —
               before you ever hit enter.
             </p>
           </div>
@@ -109,7 +109,7 @@ export default function Home() {
               <div className="num">1</div>
               <h3>Install &amp; start</h3>
               <p>
-                Run <code>tokenpilot start</code> in your project. It scans your
+                Run <code>metriq start</code> in your project. It scans your
                 files and begins tracking your session instantly.
               </p>
             </div>
@@ -117,7 +117,7 @@ export default function Home() {
               <div className="num">2</div>
               <h3>Paste a prompt</h3>
               <p>
-                Before you send a prompt to your AI tool, drop it in. TokenPilot
+                Before you send a prompt to your AI tool, drop it in. metriq
                 scores its breadth and projects its token cost.
               </p>
             </div>
@@ -176,7 +176,7 @@ export default function Home() {
             <div className="eyebrow">Works with your stack</div>
             <h2>Tool-agnostic by design</h2>
             <p>
-              TokenPilot optimizes the prompt, not the tool — so it helps no
+              metriq optimizes the prompt, not the tool — so it helps no
               matter what you paste it into.
             </p>
           </div>
@@ -255,7 +255,7 @@ export default function Home() {
       <section className="container">
         <div className="cta-band">
           <h2>Stop paying for prompts that wander.</h2>
-          <p>Install TokenPilot and focus your very next prompt.</p>
+          <p>Install metriq and focus your very next prompt.</p>
           <div className="hero-cta">
             <InstallCommand />
           </div>
@@ -268,7 +268,7 @@ export default function Home() {
           <div>
             <a className="brand" href="#top">
               <span className="brand-mark">›</span>
-              <span>TokenPilot</span>
+              <span>metriq</span>
             </a>
             <p className="muted">
               Grammarly for AI coding prompts — built for the terminal.
@@ -292,7 +292,7 @@ export default function Home() {
           </div>
         </div>
         <div className="container" style={{ marginTop: 32 }}>
-          <p className="muted">© {new Date().getFullYear()} TokenPilot</p>
+          <p className="muted">© {new Date().getFullYear()} metriq</p>
         </div>
       </footer>
     </>

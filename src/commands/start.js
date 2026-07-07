@@ -1,8 +1,8 @@
-// `tokenpilot start` — the always-on terminal companion.
+// `metriq start` — the always-on terminal companion.
 //
 // Opens an interactive REPL that analyzes every prompt you paste before you
 // send it to your AI coding tool, shows a focused rewrite, and tracks running
-// token savings for the session. This is the primary TokenPilot experience.
+// token savings for the session. This is the primary metriq experience.
 //
 // (Account linking / browser auth is stubbed for the MVP — see the note printed
 // on launch. Analysis and tracking work fully offline today.)
@@ -37,7 +37,7 @@ export function runStart(flags = {}) {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: colors.cyan("tokenpilot") + colors.gray(" › "),
+    prompt: colors.cyan("metriq") + colors.gray(" › "),
   });
 
   // Keep an in-memory history for duplicate detection within this REPL.
