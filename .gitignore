@@ -1,0 +1,14 @@
+node_modules/
+*.log
+.DS_Store
+.tokenpilot/
+examples/demo-app/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Build / deploy artifacts & secrets (also covered by web/.gitignore)
+.next/
+.vercel
+.env*
+*.tgz

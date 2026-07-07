@@ -1,0 +1,133 @@
+// Terminal rendering for TokenPilot. Boxes, bars, and the analysis report.
+
+import { colors, severityColor } from "./colors.js";
+import { dollarsFor } from "../config.js";
+
+const RATING_STYLE = {
+  focused: { color: colors.green, icon: "✓", label: "FOCUSED" },
+  moderate: { color: colors.yellow, icon: "○", label: "MODERATE" },
+  broad: { color: colors.red, icon: "⚠", label: "BROAD" },
+};
+
+const SEV_ICON = { high: "✕", medium: "!", low: "·" };
+
+export function num(n) {
+  return Number(n).toLocaleString("en-US");
+}
+
+export function money(n) {
+  return `$${n.toFixed(n < 1 ? 4 : 2)}`;
+}
+
+// A compact horizontal meter, e.g. breadth score.
+export function bar(value, max = 100, width = 24) {
+  const filled = Math.round((Math.min(value, max) / max) * width);
+  const color =
+    value >= 55 ? colors.red : value >= 25 ? colors.yellow : colors.green;
+  return color("█".repeat(filled)) + colors.gray("░".repeat(width - filled));
+}
+
+// Wrap text to a width, preserving words.
+export function wrap(text, width = 66, indent = "  ") {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let line = "";
+  for (const w of words) {
+    if ((line + " " + w).trim().length > width) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = (line + " " + w).trim();
+    }
+  }
+  if (line) lines.push(line);
+  return lines.map((l) => indent + l).join("\n");
+}
+
+function rule(char = "─", width = 60) {
+  return colors.gray(char.repeat(width));
+}
+
+// The full analysis report for a single prompt.
+export function renderAnalysis(result, opts = {}) {
+  const { optimize, relevantFiles = [], provider } = opts;
+  const a = result;
+  const style = RATING_STYLE[a.rating] || RATING_STYLE.moderate;
+  const out = [];
+
+  out.push("");
+  out.push(
+    `${style.color(colors.bold(`${style.icon} ${style.label}`))}  ` +
+      colors.gray(`breadth ${a.breadthScore}/100`)
+  );
+  out.push(`  ${bar(a.breadthScore)}`);
+  out.push("");
+
+  // Projected cost line.
+  const dollars = provider ? dollarsFor(a.projectedTokens, provider) : null;
+  out.push(
+    colors.bold("  Projected cost  ") +
+      `~${colors.cyan(num(a.projectedTokens))} tokens` +
+      colors.gray(
+        `  (prompt ${num(a.promptTokens)} + exploration ${num(
+          a.explorationTokens
+        )})`
+      ) +
+      (dollars !== null ? colors.gray(`  ≈ ${money(dollars)}`) : "")
+  );
+
+  // Issues.
+  if (a.issues.length) {
+    out.push("");
+    out.push(colors.bold("  Issues"));
+    for (const issue of a.issues) {
+      const sc = severityColor[issue.severity] || colors.gray;
+      out.push(`  ${sc(SEV_ICON[issue.severity] || "·")} ${issue.message}`);
+      if (issue.hint) out.push(colors.gray(`     → ${issue.hint}`));
+    }
+  } else {
+    out.push("");
+    out.push(colors.green("  ✓ No issues detected — this prompt is well scoped."));
+  }
+
+  // Relevant files (from scan) shown when we have them and the prompt lacked refs.
+  if (relevantFiles.length && !a.hasFileRef) {
+    out.push("");
+    out.push(colors.bold("  Likely-relevant files"));
+    for (const f of relevantFiles) out.push(`  ${colors.magenta("▫")} ${f}`);
+  }
+
+  // Optimized rewrite — only worth showing when it meaningfully helps.
+  if (optimize && optimize.savedTokens < 100) {
+    out.push("");
+    out.push(rule());
+    out.push(
+      colors.green("  ✓ Already well-scoped — no rewrite needed.")
+    );
+  } else if (optimize) {
+    out.push("");
+    out.push(rule());
+    out.push(
+      colors.green(colors.bold("  Suggested prompt")) +
+        colors.gray(
+          `   saves ~${num(optimize.savedTokens)} tokens (${optimize.savedPct}%)`
+        )
+    );
+    out.push("");
+    out.push(colors.green(wrap(optimize.focused.text, 64, "  ")));
+    if (optimize.focused.notes.length) {
+      out.push("");
+      for (const n of optimize.focused.notes) {
+        out.push(colors.gray(`  · ${n}`));
+      }
+    }
+  }
+
+  out.push("");
+  return out.join("\n");
+}
+
+export function banner() {
+  const name = colors.cyan(colors.bold("TokenPilot"));
+  return `${name} ${colors.gray("— focus your prompts, save your tokens")}`;
+}
