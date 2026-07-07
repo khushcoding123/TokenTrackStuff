@@ -37,7 +37,6 @@ export function buildFocusedPrompt(analysis, opts = {}) {
   const relevantFiles = opts.relevantFiles || [];
   const has = (id) => analysis.issues.some((i) => i.id === id);
   const parts = [];
-  const notes = [];
 
   // 1. Keep the original intent as the lead sentence.
   parts.push(normalizeIntent(analysis.prompt));
@@ -46,32 +45,25 @@ export function buildFocusedPrompt(analysis, opts = {}) {
   if (!analysis.hasFileRef) {
     if (relevantFiles.length) {
       const list = relevantFiles.map((f) => `\`${f}\``).join(", ");
-      parts.push(`Begin by checking ${list}.`);
-      notes.push("Added likely-relevant files from a project scan.");
+      parts.push(`Check ${list}.`);
     } else {
-      parts.push(
-        "Begin by checking [name the 1-3 files most likely involved]."
-      );
-      notes.push(
-        "No project scan available — fill in the bracketed starting files."
-      );
+      parts.push("Name the 1-3 files or symbols involved.");
     }
   }
 
   // 3. Add a scope guard when the prompt could sprawl.
   if (has("broad-scope") || has("heavy-change") || has("no-constraint") || has("vague-verb")) {
     parts.push(
-      "Do not redesign the UI or refactor unrelated components. Make the smallest change necessary."
+      "Make the smallest change necessary. Do not refactor unrelated code."
     );
-    notes.push("Added a scope guard to prevent unrelated changes.");
   }
 
   // 4. Ask for a short report of what changed — cheap and keeps output tight.
-  parts.push("Briefly explain which files you modified and why.");
+  parts.push("Briefly list what changed.");
 
   const text = parts.join(" ");
 
-  return { text, notes };
+  return { text, notes: [] };
 }
 
 // Convenience: analyze + rewrite + compute projected savings in one call.

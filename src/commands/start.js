@@ -21,22 +21,16 @@ export function runStart(flags = {}) {
   console.log("");
   console.log(banner());
   console.log(
-    colors.gray(
-      "  Session tracking active. Paste a prompt to analyze it before you send it."
-    )
+    colors.gray("  Paste a prompt.")
   );
   console.log(
-    colors.gray(
-      "  Commands: ") +
+    colors.gray("  ") +
       colors.cyan(":stats") +
-      colors.gray(" summary  ·  ") +
+      colors.gray("  ") +
       colors.cyan(":clear") +
-      colors.gray(" screen  ·  ") +
+      colors.gray("  ") +
       colors.cyan(":quit") +
-      colors.gray(" exit")
-  );
-  console.log(
-    colors.gray("  Account linking (browser auth) arrives in the next build.")
+      colors.gray("")
   );
   console.log("");
 
@@ -110,7 +104,7 @@ export function runStart(flags = {}) {
         colors.green(`~${num(s.savedTokens)} tokens saved`) +
         colors.gray(` (≈ ${money(s.dollarsSaved)})`)
     );
-    console.log(colors.gray("  Run ") + colors.cyan("tokenpilot stats") + colors.gray(" any time.\n"));
+    console.log("");
     process.exit(0);
   });
 }

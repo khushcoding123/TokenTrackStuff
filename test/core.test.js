@@ -67,7 +67,7 @@ test("optimize: broad prompt yields positive savings and a rewrite", () => {
   assert.ok(r.savedTokens > 0);
   assert.ok(r.savedPct > 0);
   assert.match(r.focused.text, /smallest change/i);
-  assert.match(r.focused.text, /explain which files/i);
+  assert.match(r.focused.text, /briefly list what changed/i);
 });
 
 test("buildFocusedPrompt: uses scanned files when provided", () => {

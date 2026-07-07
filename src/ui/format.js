@@ -66,34 +66,28 @@ export function renderAnalysis(result, opts = {}) {
   // Projected cost line.
   const dollars = provider ? dollarsFor(a.projectedTokens, provider) : null;
   out.push(
-    colors.bold("  Projected cost  ") +
+    colors.bold("  Cost  ") +
       `~${colors.cyan(num(a.projectedTokens))} tokens` +
-      colors.gray(
-        `  (prompt ${num(a.promptTokens)} + exploration ${num(
-          a.explorationTokens
-        )})`
-      ) +
       (dollars !== null ? colors.gray(`  ≈ ${money(dollars)}`) : "")
   );
 
   // Issues.
   if (a.issues.length) {
     out.push("");
-    out.push(colors.bold("  Issues"));
-    for (const issue of a.issues) {
+    out.push(colors.bold("  Flags"));
+    for (const issue of a.issues.slice(0, 3)) {
       const sc = severityColor[issue.severity] || colors.gray;
       out.push(`  ${sc(SEV_ICON[issue.severity] || "·")} ${issue.message}`);
-      if (issue.hint) out.push(colors.gray(`     → ${issue.hint}`));
     }
   } else {
     out.push("");
-    out.push(colors.green("  ✓ No issues detected — this prompt is well scoped."));
+    out.push(colors.green("  ✓ Well scoped."));
   }
 
   // Relevant files (from scan) shown when we have them and the prompt lacked refs.
   if (relevantFiles.length && !a.hasFileRef) {
     out.push("");
-    out.push(colors.bold("  Likely-relevant files"));
+    out.push(colors.bold("  Files"));
     for (const f of relevantFiles) out.push(`  ${colors.magenta("▫")} ${f}`);
   }
 
@@ -101,26 +95,16 @@ export function renderAnalysis(result, opts = {}) {
   if (optimize && optimize.savedTokens < 100) {
     out.push("");
     out.push(rule());
-    out.push(
-      colors.green("  ✓ Already well-scoped — no rewrite needed.")
-    );
+    out.push(colors.green("  ✓ No rewrite needed."));
   } else if (optimize) {
     out.push("");
     out.push(rule());
     out.push(
-      colors.green(colors.bold("  Suggested prompt")) +
-        colors.gray(
-          `   saves ~${num(optimize.savedTokens)} tokens (${optimize.savedPct}%)`
-        )
+      colors.green(colors.bold("  Suggestion")) +
+        colors.gray(`   saves ~${num(optimize.savedTokens)} tokens`)
     );
     out.push("");
     out.push(colors.green(wrap(optimize.focused.text, 64, "  ")));
-    if (optimize.focused.notes.length) {
-      out.push("");
-      for (const n of optimize.focused.notes) {
-        out.push(colors.gray(`  · ${n}`));
-      }
-    }
   }
 
   out.push("");
@@ -129,5 +113,5 @@ export function renderAnalysis(result, opts = {}) {
 
 export function banner() {
   const name = colors.cyan(colors.bold("TokenPilot"));
-  return `${name} ${colors.gray("— focus your prompts, save your tokens")}`;
+  return `${name} ${colors.gray("— prompt focus")}`;
 }
