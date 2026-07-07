@@ -1,5 +1,7 @@
 # TokenPilot
 
+**Live demo:** https://tokenpilot-mocha.vercel.app · **npm:** [`@kkothari/tokenpilot`](https://www.npmjs.com/package/@kkothari/tokenpilot)
+
 **Terminal-first AI assistant for vibecoders.** TokenPilot sits between you and
 your AI coding tool (Claude Code, Cursor, Codex, Gemini CLI, …). Before a prompt
 is sent, it estimates how expensive the prompt will be, flags whether it's too
