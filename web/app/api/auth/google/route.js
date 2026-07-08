@@ -10,13 +10,22 @@ export async function GET(request) {
   const isDesktop = request.nextUrl.searchParams.get("desktop") === "1";
   const errorRedirect = isDesktop ? "/login?desktop=1&error=oauth_start_failed" : "/login?error=oauth_start_failed";
 
-  const redirectTo = new URL("/api/auth/callback", process.env.NEXT_PUBLIC_APP_URL).toString();
+  // Primary signal: encode the flag directly into the redirectTo URL we hand
+  // InsForge. InsForge relays this exact string through its own OAuth state
+  // (Google -> api.insforge.dev -> <project>.insforge.app -> back to us),
+  // so it survives that chain by construction instead of depending on a
+  // cookie surviving in parallel across three third-party hops.
+  const callbackPath = isDesktop ? "/api/auth/callback?desktop=1" : "/api/auth/callback";
+  const redirectTo = new URL(callbackPath, process.env.NEXT_PUBLIC_APP_URL).toString();
+  console.log("[metriq-desktop-debug] /api/auth/google", { isDesktop, redirectTo });
+
   const { data, error } = await auth.signInWithOAuth("google", {
     redirectTo,
     skipBrowserRedirect: true,
   });
 
   if (error || !data?.url || !data?.codeVerifier) {
+    console.log("[metriq-desktop-debug] /api/auth/google oauth_start_failed", { isDesktop, error });
     return NextResponse.redirect(new URL(errorRedirect, request.url));
   }
 
@@ -28,9 +37,8 @@ export async function GET(request) {
     maxAge: 600,
   });
 
-  // Remember this was a desktop-app handoff so the callback route knows to
-  // hand back a bearer token via /desktop-connected instead of just
-  // redirecting into the web dashboard.
+  // Fallback signal, kept in case some intermediary strips query strings on
+  // the redirectTo URL: same isDesktop flag, via a first-party cookie.
   if (isDesktop) {
     cookieStore.set("insforge_oauth_desktop", "1", {
       httpOnly: true,

@@ -10,7 +10,16 @@ export async function GET(request) {
   const oauthError = request.nextUrl.searchParams.get("error");
 
   const cookieStore = await cookies();
-  const isDesktop = cookieStore.get("insforge_oauth_desktop")?.value === "1";
+  const desktopFromQuery = request.nextUrl.searchParams.get("desktop") === "1";
+  const desktopFromCookie = cookieStore.get("insforge_oauth_desktop")?.value === "1";
+  const isDesktop = desktopFromQuery || desktopFromCookie;
+  console.log("[metriq-desktop-debug] /api/auth/callback", {
+    desktopFromQuery,
+    desktopFromCookie,
+    isDesktop,
+    hasCode: Boolean(code),
+    oauthError,
+  });
   const errorRedirect = (reason) =>
     NextResponse.redirect(new URL(isDesktop ? `/login?desktop=1&error=${reason}` : `/login?error=${reason}`, request.url));
 
