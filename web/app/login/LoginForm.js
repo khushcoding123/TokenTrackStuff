@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-const inputClass =
-  "bg-surface-glass border border-border-subtle rounded-lg px-3 py-2 text-label-md font-label-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full";
+import FloatingInput from "../components/FloatingInput";
 
 function GoogleIcon() {
   return (
@@ -106,35 +104,23 @@ export default function LoginForm() {
       </div>
 
       <form className="flex flex-col gap-stack-md" onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-1">
-          <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor="email">
-            Email
-          </label>
-          <input
-            className={inputClass}
-            id="email"
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            value={email}
-          />
-          {fieldErrors.email && <span className="font-body-sm text-body-sm text-error">{fieldErrors.email}</span>}
-        </div>
+        <FloatingInput
+          error={fieldErrors.email}
+          icon="mail"
+          label="Email"
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          value={email}
+        />
 
-        <div className="flex flex-col gap-1">
-          <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor="password">
-            Password
-          </label>
-          <input
-            className={inputClass}
-            id="password"
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            value={password}
-          />
-          {fieldErrors.password && (
-            <span className="font-body-sm text-body-sm text-error">{fieldErrors.password}</span>
-          )}
-        </div>
+        <FloatingInput
+          error={fieldErrors.password}
+          icon="lock"
+          label="Password"
+          onChange={(e) => setPassword(e.target.value)}
+          type="password"
+          value={password}
+        />
 
         {(formError || oauthErrorMessage) && (
           <div className="bg-error/10 border border-error/20 text-error rounded-lg px-3 py-2 font-body-sm text-body-sm">

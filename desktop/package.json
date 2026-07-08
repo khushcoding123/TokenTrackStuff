@@ -7,10 +7,23 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test"
+    "test": "node --test",
+    "package:mac": "electron-builder --mac --dir"
   },
   "devDependencies": {
-    "electron": "^43.1.0"
+    "electron": "^43.1.0",
+    "electron-builder": "^25.1.8"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "build": {
+    "appId": "app.metriq.desktop",
+    "productName": "Metriq",
+    "files": ["src/**/*", "renderer/**/*", "package.json"],
+    "extraResources": [{ "from": "../packages/core", "to": "packages/core" }],
+    "mac": {
+      "icon": "renderer/assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "target": "dir"
+    }
+  }
 }

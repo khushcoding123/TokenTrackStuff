@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-const inputClass =
-  "bg-surface-glass border border-border-subtle rounded-lg px-3 py-2 text-label-md font-label-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full";
+import FloatingInput from "../components/FloatingInput";
 
 function GoogleIcon() {
   return (
@@ -32,8 +30,9 @@ function GoogleIcon() {
 export default function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState("");
@@ -47,6 +46,8 @@ export default function SignupForm() {
     setSubmitting(true);
     setFormError("");
     setFieldErrors({});
+
+    const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
 
     try {
       const res = await fetch("/api/auth/signup", {
@@ -105,48 +106,30 @@ export default function SignupForm() {
       </div>
 
       <form className="flex flex-col gap-stack-md" onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-1">
-          <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor="email">
-            Email
-          </label>
-          <input
-            className={inputClass}
-            id="email"
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            value={email}
-          />
-          {fieldErrors.email && <span className="font-body-sm text-body-sm text-error">{fieldErrors.email}</span>}
+        <div className="grid grid-cols-2 gap-3">
+          <FloatingInput label="First name" onChange={(e) => setFirstName(e.target.value)} value={firstName} />
+          <FloatingInput label="Last name" onChange={(e) => setLastName(e.target.value)} value={lastName} />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor="name">
-            Display name <span className="text-on-surface-variant/60">(optional)</span>
-          </label>
-          <input
-            className={inputClass}
-            id="name"
-            onChange={(e) => setName(e.target.value)}
-            type="text"
-            value={name}
-          />
-        </div>
+        <FloatingInput
+          error={fieldErrors.email}
+          icon="mail"
+          label="Email"
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          value={email}
+        />
 
         <div className="flex flex-col gap-1">
-          <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor="password">
-            Password
-          </label>
-          <input
-            className={inputClass}
-            id="password"
+          <FloatingInput
+            error={fieldErrors.password}
+            icon="lock"
+            label="Password"
             onChange={(e) => setPassword(e.target.value)}
             type="password"
             value={password}
           />
-          {fieldErrors.password && (
-            <span className="font-body-sm text-body-sm text-error">{fieldErrors.password}</span>
-          )}
-          <span className="font-body-sm text-body-sm text-on-surface-variant/70 mt-0.5">At least 6 characters.</span>
+          <span className="font-body-sm text-body-sm text-on-surface-variant/70">At least 6 characters.</span>
         </div>
 
         {formError && (
@@ -160,7 +143,7 @@ export default function SignupForm() {
           disabled={submitting}
           type="submit"
         >
-          {submitting ? "Creating account…" : "Sign up"}
+          {submitting ? "Creating account…" : "Create account"}
         </button>
       </form>
     </div>

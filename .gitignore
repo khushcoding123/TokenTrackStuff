@@ -13,6 +13,11 @@ examples/demo-app/
 .env*
 *.tgz
 
+# Electron packaging output (desktop/dist/*.app etc.) — built locally via
+# `npm run package:mac`, never committed. Contains 100MB+ framework
+# binaries that exceed GitHub's file size limit.
+desktop/dist/
+
 # InsForge & AI agent skills
 .insforge
 .agent

@@ -56,12 +56,13 @@ export default function DesktopConnectedClient() {
       </div>
       <h2 className="font-headline-lg text-headline-lg text-on-background">You're signed in</h2>
       <p className="font-body-sm text-body-sm text-on-surface-variant">
-        Opening the Metriq desktop app… if nothing happens, click below, or return to the app yourself. You can
-        close this tab afterward.
+        Click below to finish connecting the Metriq app — browsers generally require a click to hand off to a
+        desktop app, so this step doesn't happen automatically. You can close this tab afterward.
       </p>
       {callbackUrl && (
         <a
-          className="bg-primary/10 border border-primary text-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:bg-primary/20 transition-all duration-300"
+          autoFocus
+          className="bg-primary text-on-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:opacity-90 transition-all duration-300 w-full"
           href={callbackUrl}
         >
           Open Metriq
