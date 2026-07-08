@@ -9,6 +9,17 @@
   const projectsList = document.getElementById("projects-list");
   const projectsEmpty = document.getElementById("projects-empty");
   const projectsError = document.getElementById("projects-error");
+  const btnOpenCapture = document.getElementById("btn-open-capture");
+  const captureHotkeyLabel = document.getElementById("capture-hotkey-label");
+  const toolsList = document.getElementById("tools-list");
+
+  const AVAILABLE_TOOLS = [
+    { id: "claude", label: "Claude" },
+    { id: "chatgpt", label: "ChatGPT" },
+    { id: "vscode", label: "VS Code" },
+    { id: "cursor", label: "Cursor" },
+    { id: "other", label: "Other / terminal" },
+  ];
 
   function showLoggedOut() {
     viewHome.classList.add("hidden");
@@ -24,6 +35,38 @@
     viewLogin.classList.add("hidden");
     viewHome.classList.remove("hidden");
     refreshProjects();
+    initTools();
+  }
+
+  function formatHotkey(accelerator) {
+    // Electron accelerators use "CommandOrControl" — show the platform-real
+    // symbol instead of that verbose token.
+    const isMac = navigator.platform.toLowerCase().includes("mac");
+    return accelerator
+      .replace("CommandOrControl", isMac ? "⌘" : "Ctrl")
+      .replace("Shift", isMac ? "⇧" : "Shift")
+      .split("+")
+      .join(isMac ? "" : "+");
+  }
+
+  async function initTools() {
+    const selected = new Set(await window.metriq.getTools());
+    toolsList.innerHTML = "";
+    for (const tool of AVAILABLE_TOOLS) {
+      const label = document.createElement("label");
+      label.className = "tool-chip" + (selected.has(tool.id) ? " is-checked" : "");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = selected.has(tool.id);
+      checkbox.addEventListener("change", async () => {
+        if (checkbox.checked) selected.add(tool.id);
+        else selected.delete(tool.id);
+        label.classList.toggle("is-checked", checkbox.checked);
+        await window.metriq.setTools([...selected]);
+      });
+      label.append(checkbox, document.createTextNode(tool.label));
+      toolsList.append(label);
+    }
   }
 
   function showProjectsError(message) {
@@ -72,7 +115,7 @@
       activeBtn.textContent = project.id === activeId ? "Active" : "Set active";
       if (project.id === activeId) activeBtn.classList.add("is-active-btn");
       activeBtn.addEventListener("click", async () => {
-        await window.metriq.setActiveProject(project.id);
+        await window.metriq.setActiveProject(project);
         refreshProjects();
       });
 
@@ -134,6 +177,12 @@
   btnLogout.addEventListener("click", async () => {
     await window.metriq.logout();
     showLoggedOut();
+  });
+
+  btnOpenCapture.addEventListener("click", () => window.metriq.openCapture());
+
+  window.metriq.getCaptureHotkey().then((hotkey) => {
+    captureHotkeyLabel.textContent = formatHotkey(hotkey);
   });
 
   btnLinkProject.addEventListener("click", async () => {

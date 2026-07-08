@@ -1,13 +1,15 @@
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog } = require("electron");
+const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog, globalShortcut, clipboard, screen } = require("electron");
 const path = require("node:path");
 const { saveSession, loadSession, clearSession } = require("./auth-store");
 const { PROTOCOL, findProtocolUrlInArgv, parseAuthCallbackUrl } = require("./protocol");
 const { saveFileIndex, loadFileIndex, removeFileIndex } = require("./project-cache");
 const { loadPrefs, savePrefs } = require("./prefs");
 const insforge = require("./insforge-client");
-const { listSourceFiles } = require("../../packages/core/scanner.js");
+const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scanner.js");
+const { optimize } = require("../../packages/core/rewrite.js");
 
 const WEB_BASE_URL = process.env.METRIQ_WEB_URL || "https://tokenpilot-mocha.vercel.app";
+const CAPTURE_HOTKEY = process.env.METRIQ_CAPTURE_HOTKEY || "CommandOrControl+Shift+M";
 
 // Test-only hook: Playwright's electronApplication.evaluate() runs in the
 // main process's global scope, which doesn't have this module's local
@@ -33,10 +35,12 @@ if (process.env.METRIQ_E2E_TEST === "1") {
         byteLength: raw.length,
       };
     },
+    readClipboardText: () => clipboard.readText(),
   };
 }
 
 let mainWindow = null;
+let captureWindow = null;
 let tray = null;
 
 // --- Protocol registration ---------------------------------------------
@@ -86,6 +90,81 @@ function createWindow() {
   });
 
   return mainWindow;
+}
+
+// The floating prompt-capture window — small, always-on-top, positioned
+// near the cursor so it feels like a quick-entry palette rather than a
+// full app window. Toggled by the global hotkey or a button in the main
+// window; a second trigger while it's open just hides it again.
+function createCaptureWindow() {
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  const width = 480;
+  const height = 420;
+
+  captureWindow = new BrowserWindow({
+    width,
+    height,
+    x: Math.round(display.workArea.x + (display.workArea.width - width) / 2),
+    y: Math.round(display.workArea.y + (display.workArea.height - height) / 3),
+    resizable: true,
+    minimizable: false,
+    maximizable: false,
+    alwaysOnTop: true,
+    frame: true,
+    title: "Metriq — Capture",
+    backgroundColor: "#0B0F14",
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  // Newly created/shown windows can receive a spurious initial blur before
+  // OS focus genuinely settles on them (window-manager-dependent). Ignore
+  // blur events for a brief grace period right after showing so the window
+  // can't vanish before the user gets a chance to use it; genuine "click
+  // away" dismissal past that point still works immediately.
+  let shownAt = 0;
+  const BLUR_GRACE_MS = 400;
+
+  captureWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  captureWindow.loadFile(path.join(__dirname, "..", "renderer", "capture.html"));
+  captureWindow.once("ready-to-show", () => {
+    captureWindow.show();
+    shownAt = Date.now();
+  });
+  captureWindow.on("closed", () => {
+    captureWindow = null;
+  });
+  captureWindow.on("blur", () => {
+    // Quick-palette feel: clicking away dismisses it, like Spotlight.
+    if (Date.now() - shownAt < BLUR_GRACE_MS) return;
+    captureWindow?.close();
+  });
+
+  return captureWindow;
+}
+
+function toggleCaptureWindow() {
+  if (captureWindow) {
+    captureWindow.close();
+    return;
+  }
+  createCaptureWindow();
+}
+
+if (process.env.METRIQ_E2E_TEST === "1") {
+  // Closing the capture window is normally triggered from inside its own
+  // renderer via IPC — but calling that through Playwright's
+  // page.evaluate() always reports a "context closed" error, since the
+  // call's own side effect (closing the window) destroys the JS context
+  // evaluate needs to resolve its result. Closing it from here (the main
+  // process's own persistent context) avoids that self-inflicted race.
+  global.__metriqTest.closeCaptureWindow = () => captureWindow?.close();
 }
 
 function createTray() {
@@ -240,6 +319,13 @@ if (!gotSingleInstanceLock) {
     createTray();
     createWindow();
 
+    const registered = globalShortcut.register(CAPTURE_HOTKEY, toggleCaptureWindow);
+    if (!registered) {
+      // Another app already owns this combo — not fatal, the in-app button
+      // still opens the capture window.
+      console.warn(`Could not register global hotkey ${CAPTURE_HOTKEY} (already in use?)`);
+    }
+
     // Windows/Linux cold start via protocol link: the URL is a plain argv
     // entry on this very first launch.
     maybeHandleArgv(process.argv);
@@ -253,6 +339,12 @@ if (!gotSingleInstanceLock) {
     // Keep running in the tray on all platforms — this is a background
     // companion app, not a document window.
   });
+
+  app.on("will-quit", () => {
+    globalShortcut.unregisterAll();
+  });
+
+  ipcMain.handle("app:get-capture-hotkey", () => CAPTURE_HOTKEY);
 
   ipcMain.handle("auth:get-session", () => loadSession());
 
@@ -308,7 +400,7 @@ if (!gotSingleInstanceLock) {
     });
 
     saveFileIndex(project.id, { files, scannedAt });
-    savePrefs({ activeProjectId: project.id });
+    savePrefs({ activeProject: { id: project.id, name: project.name, path: project.path } });
     return project;
   });
 
@@ -332,18 +424,66 @@ if (!gotSingleInstanceLock) {
     await insforge.deleteLinkedProject(token, projectId);
     removeFileIndex(projectId);
     const prefs = loadPrefs();
-    if (prefs.activeProjectId === projectId) {
-      savePrefs({ activeProjectId: null });
+    if (prefs.activeProject?.id === projectId) {
+      savePrefs({ activeProject: null });
     }
     return true;
   });
 
-  ipcMain.handle("projects:set-active", (_event, projectId) => {
-    savePrefs({ activeProjectId: projectId });
+  ipcMain.handle("projects:set-active", (_event, project) => {
+    savePrefs({ activeProject: { id: project.id, name: project.name, path: project.path } });
     return true;
   });
 
-  ipcMain.handle("projects:get-active-id", () => loadPrefs().activeProjectId ?? null);
+  ipcMain.handle("projects:get-active-id", () => loadPrefs().activeProject?.id ?? null);
+
+  ipcMain.handle("projects:get-active-project", () => loadPrefs().activeProject ?? null);
 
   ipcMain.handle("projects:get-file-index", (_event, projectId) => loadFileIndex(projectId));
+
+  // --- Tool preferences ---------------------------------------------------
+
+  ipcMain.handle("prefs:get-tools", () => loadPrefs().tools ?? []);
+
+  ipcMain.handle("prefs:set-tools", (_event, tools) => {
+    savePrefs({ tools });
+    return true;
+  });
+
+  // --- Prompt capture window ----------------------------------------------
+
+  ipcMain.handle("capture:open", () => {
+    if (!captureWindow) createCaptureWindow();
+  });
+
+  ipcMain.handle("capture:close", () => {
+    captureWindow?.close();
+  });
+
+  ipcMain.handle("capture:get-context", () => ({
+    activeProject: loadPrefs().activeProject ?? null,
+    tools: loadPrefs().tools ?? [],
+  }));
+
+  ipcMain.handle("capture:analyze", (_event, prompt) => {
+    const activeProject = loadPrefs().activeProject;
+    const relevantFiles = activeProject ? findRelevantFiles(prompt, activeProject.path) : [];
+    const result = optimize(prompt, { relevantFiles });
+    return {
+      breadthScore: result.analysis.breadthScore,
+      rating: result.analysis.rating,
+      issues: result.analysis.issues,
+      promptTokens: result.analysis.promptTokens,
+      projectedTokens: result.analysis.projectedTokens,
+      relevantFiles,
+      focusedPrompt: result.focused.text,
+      savedTokens: result.savedTokens,
+      savedPct: result.savedPct,
+    };
+  });
+
+  ipcMain.handle("capture:copy", (_event, text) => {
+    clipboard.writeText(text);
+    return true;
+  });
 }

@@ -298,3 +298,55 @@ h2 {
   margin-top: 16px;
   margin-bottom: 8px;
 }
+
+.capture-cta {
+  max-width: 320px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.capture-hotkey-label {
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 500;
+}
+
+.tools-section {
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+  margin-top: 20px;
+}
+
+.tools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tool-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+}
+
+.tool-chip input {
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.tool-chip.is-checked {
+  border-color: var(--primary);
+  color: var(--primary);
+}

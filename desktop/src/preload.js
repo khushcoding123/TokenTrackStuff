@@ -7,6 +7,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("metriq", {
+  getCaptureHotkey: () => ipcRenderer.invoke("app:get-capture-hotkey"),
+
   getSession: () => ipcRenderer.invoke("auth:get-session"),
   openLogin: () => ipcRenderer.invoke("auth:open-login"),
   openSignup: () => ipcRenderer.invoke("auth:open-signup"),
@@ -27,7 +29,17 @@ contextBridge.exposeInMainWorld("metriq", {
   listProjects: () => ipcRenderer.invoke("projects:list"),
   rescanProject: (project) => ipcRenderer.invoke("projects:rescan", project),
   removeProject: (projectId) => ipcRenderer.invoke("projects:remove", projectId),
-  setActiveProject: (projectId) => ipcRenderer.invoke("projects:set-active", projectId),
+  setActiveProject: (project) => ipcRenderer.invoke("projects:set-active", project),
   getActiveProjectId: () => ipcRenderer.invoke("projects:get-active-id"),
+  getActiveProject: () => ipcRenderer.invoke("projects:get-active-project"),
   getFileIndex: (projectId) => ipcRenderer.invoke("projects:get-file-index", projectId),
+
+  getTools: () => ipcRenderer.invoke("prefs:get-tools"),
+  setTools: (tools) => ipcRenderer.invoke("prefs:set-tools", tools),
+
+  openCapture: () => ipcRenderer.invoke("capture:open"),
+  closeCapture: () => ipcRenderer.invoke("capture:close"),
+  getCaptureContext: () => ipcRenderer.invoke("capture:get-context"),
+  analyzePrompt: (prompt) => ipcRenderer.invoke("capture:analyze", prompt),
+  copyToClipboard: (text) => ipcRenderer.invoke("capture:copy", text),
 });

@@ -1,0 +1,138 @@
+.capture-body {
+  user-select: text;
+}
+
+#capture-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+}
+
+.capture-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* .brand is `position: absolute` in the shared stylesheet, for the main
+   window's layout (fixed top-left, content centered separately below it).
+   That breaks this window's flex header, which needs brand + context to
+   sit side by side in normal flow — override it back to static here. */
+.capture-header .brand {
+  position: static;
+  top: auto;
+  left: auto;
+}
+
+.brand-mark-sm {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+}
+
+.brand-name-sm {
+  font-size: 13px;
+}
+
+.capture-context {
+  font-size: 11px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-input {
+  width: 100%;
+  min-height: 80px;
+  max-height: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--on-background);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.capture-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.capture-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.capture-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.capture-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(75, 226, 119, 0.15);
+  color: var(--primary);
+}
+
+.capture-badge.rating-broad {
+  background: rgba(255, 180, 171, 0.15);
+  color: var(--error);
+}
+
+.capture-badge.rating-moderate {
+  background: rgba(255, 186, 97, 0.15);
+  color: #ffba61;
+}
+
+.capture-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.capture-focused-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.capture-focused {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.capture-copy-btn {
+  width: 100%;
+  max-width: none;
+  margin-top: 0;
+}
+
+.capture-hint {
+  font-size: 10px;
+  text-align: center;
+  margin: 0;
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>Metriq — Capture</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="capture.css" />
+  </head>
+  <body class="capture-body">
+    <div id="capture-app">
+      <div class="capture-header">
+        <div class="brand">
+          <div class="brand-mark brand-mark-sm">M</div>
+          <span class="brand-name brand-name-sm">Metriq</span>
+        </div>
+        <span id="capture-context" class="capture-context muted">No project linked</span>
+      </div>
+
+      <textarea
+        id="capture-input"
+        class="capture-input"
+        placeholder="Paste or type the prompt you're about to send…"
+        autofocus
+      ></textarea>
+
+      <div id="capture-result" class="capture-result hidden">
+        <div class="capture-score-row">
+          <span id="capture-rating" class="capture-badge">—</span>
+          <span id="capture-score" class="muted">breadth —/100</span>
+          <span id="capture-savings" class="muted"></span>
+        </div>
+
+        <ul id="capture-issues" class="capture-issues"></ul>
+
+        <div class="capture-focused-label muted">Focused prompt</div>
+        <div id="capture-focused" class="capture-focused"></div>
+
+        <button id="btn-copy" class="btn btn-primary capture-copy-btn">Copy improved prompt</button>
+      </div>
+
+      <p class="capture-hint muted">Esc to close · updates as you type</p>
+    </div>
+    <script src="capture.js"></script>
+  </body>
+</html>
