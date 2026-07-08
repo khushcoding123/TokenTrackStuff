@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { estimateTokens } from "../packages/core/tokenizer.js";
 import { analyzePrompt, ratingFor } from "../packages/core/analyzer.js";
 import { optimize, buildFocusedPrompt } from "../packages/core/rewrite.js";
-import { keywordsFromPrompt } from "../packages/core/scanner.js";
+import { keywordsFromPrompt, listSourceFiles } from "../packages/core/scanner.js";
 
 test("estimateTokens: empty and non-empty", () => {
   assert.equal(estimateTokens(""), 0);
@@ -85,4 +85,15 @@ test("keywordsFromPrompt: drops stopwords and short tokens", () => {
   assert.ok(kws.includes("token"));
   assert.ok(!kws.includes("fix")); // stopword
   assert.ok(!kws.includes("the")); // stopword
+});
+
+test("listSourceFiles: finds this repo's own engine source files", () => {
+  const files = listSourceFiles(new URL("../packages/core", import.meta.url).pathname);
+  assert.ok(files.includes("analyzer.js"));
+  assert.ok(files.includes("scanner.js"));
+  assert.ok(files.every((f) => !f.includes("\\"))); // forward slashes only
+});
+
+test("listSourceFiles: returns [] for a nonexistent path", () => {
+  assert.deepEqual(listSourceFiles("/definitely/not/a/real/path/xyz"), []);
 });

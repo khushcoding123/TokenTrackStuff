@@ -14,6 +14,10 @@
   box-sizing: border-box;
 }
 
+.hidden {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--background);
@@ -38,10 +42,6 @@ body {
   padding: 32px 28px;
   text-align: center;
   gap: 12px;
-}
-
-.view.hidden {
-  display: none;
 }
 
 .brand {
@@ -123,10 +123,6 @@ h2 {
   margin-top: 8px;
 }
 
-.waiting.hidden {
-  display: none;
-}
-
 .identity {
   display: flex;
   align-items: center;
@@ -168,4 +164,137 @@ h2 {
   padding: 16px;
   text-align: left;
   margin: 8px 0;
+}
+
+/* Logged-in home: top-aligned + scrollable instead of vertically centered,
+   since the project list can grow. */
+.view-home {
+  justify-content: flex-start;
+  padding-top: 64px;
+  overflow-y: auto;
+}
+
+.projects-section {
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+  margin-top: 8px;
+  flex: 1;
+}
+
+.projects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.projects-header h2 {
+  margin: 0;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.btn-link:hover {
+  opacity: 0.8;
+}
+
+.projects-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.project-item.is-active {
+  border-color: var(--primary);
+}
+
+.project-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-path {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.project-meta {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  margin-top: 6px;
+}
+
+.project-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.project-actions button {
+  flex: 1;
+  background: rgba(75, 226, 119, 0.08);
+  border: 1px solid var(--border);
+  color: var(--on-surface-variant);
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.project-actions button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.project-actions button.is-active-btn {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.projects-empty {
+  padding: 12px 0;
+}
+
+.error-text {
+  color: var(--error);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+
+.btn-logout {
+  margin-top: 16px;
+  margin-bottom: 8px;
 }

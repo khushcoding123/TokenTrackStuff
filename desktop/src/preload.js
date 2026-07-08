@@ -21,4 +21,13 @@ contextBridge.exposeInMainWorld("metriq", {
     ipcRenderer.on("auth:logged-out", listener);
     return () => ipcRenderer.removeListener("auth:logged-out", listener);
   },
+
+  pickFolder: () => ipcRenderer.invoke("projects:pick-folder"),
+  linkProject: (folderPath) => ipcRenderer.invoke("projects:link", folderPath),
+  listProjects: () => ipcRenderer.invoke("projects:list"),
+  rescanProject: (project) => ipcRenderer.invoke("projects:rescan", project),
+  removeProject: (projectId) => ipcRenderer.invoke("projects:remove", projectId),
+  setActiveProject: (projectId) => ipcRenderer.invoke("projects:set-active", projectId),
+  getActiveProjectId: () => ipcRenderer.invoke("projects:get-active-id"),
+  getFileIndex: (projectId) => ipcRenderer.invoke("projects:get-file-index", projectId),
 });

@@ -1,7 +1,11 @@
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog } = require("electron");
 const path = require("node:path");
 const { saveSession, loadSession, clearSession } = require("./auth-store");
 const { PROTOCOL, findProtocolUrlInArgv, parseAuthCallbackUrl } = require("./protocol");
+const { saveFileIndex, loadFileIndex, removeFileIndex } = require("./project-cache");
+const { loadPrefs, savePrefs } = require("./prefs");
+const insforge = require("./insforge-client");
+const { listSourceFiles } = require("../../packages/core/scanner.js");
 
 const WEB_BASE_URL = process.env.METRIQ_WEB_URL || "https://tokenpilot-mocha.vercel.app";
 
@@ -265,4 +269,81 @@ if (!gotSingleInstanceLock) {
     updateTrayMenu();
     return true;
   });
+
+  // --- Project linking --------------------------------------------------
+
+  function requireToken() {
+    const session = loadSession();
+    if (!session?.token) {
+      const err = new Error("Not logged in.");
+      err.code = "NOT_AUTHENTICATED";
+      throw err;
+    }
+    return session.token;
+  }
+
+  function scanFolder(folderPath) {
+    const files = listSourceFiles(folderPath);
+    return { files, scannedAt: new Date().toISOString() };
+  }
+
+  ipcMain.handle("projects:pick-folder", async () => {
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle("projects:link", async (_event, folderPath) => {
+    const token = requireToken();
+    const { files, scannedAt } = scanFolder(folderPath);
+    const name = path.basename(folderPath);
+
+    const project = await insforge.createLinkedProject(token, {
+      name,
+      path: folderPath,
+      kind: "local",
+      fileCount: files.length,
+    });
+
+    saveFileIndex(project.id, { files, scannedAt });
+    savePrefs({ activeProjectId: project.id });
+    return project;
+  });
+
+  ipcMain.handle("projects:list", async () => {
+    const token = requireToken();
+    return insforge.listLinkedProjects(token);
+  });
+
+  ipcMain.handle("projects:rescan", async (_event, project) => {
+    const token = requireToken();
+    const { files, scannedAt } = scanFolder(project.path);
+    saveFileIndex(project.id, { files, scannedAt });
+    return insforge.updateLinkedProject(token, project.id, {
+      file_count: files.length,
+      last_scanned_at: scannedAt,
+    });
+  });
+
+  ipcMain.handle("projects:remove", async (_event, projectId) => {
+    const token = requireToken();
+    await insforge.deleteLinkedProject(token, projectId);
+    removeFileIndex(projectId);
+    const prefs = loadPrefs();
+    if (prefs.activeProjectId === projectId) {
+      savePrefs({ activeProjectId: null });
+    }
+    return true;
+  });
+
+  ipcMain.handle("projects:set-active", (_event, projectId) => {
+    savePrefs({ activeProjectId: projectId });
+    return true;
+  });
+
+  ipcMain.handle("projects:get-active-id", () => loadPrefs().activeProjectId ?? null);
+
+  ipcMain.handle("projects:get-file-index", (_event, projectId) => loadFileIndex(projectId));
 }

@@ -61,6 +61,24 @@ function walk(dir, root, files, depth) {
   }
 }
 
+// Returns the raw list of source files under `root` (same walk/ignore/
+// extension rules findRelevantFiles uses internally), with no prompt or
+// keyword filtering. Used to build a file index when a project is linked —
+// before there's any prompt yet to score files against.
+export function listSourceFiles(root = process.cwd()) {
+  let stat;
+  try {
+    stat = statSync(root);
+  } catch {
+    return [];
+  }
+  if (!stat.isDirectory()) return [];
+
+  const files = [];
+  walk(root, root, files, 0);
+  return files;
+}
+
 export function keywordsFromPrompt(prompt) {
   return [
     ...new Set(
