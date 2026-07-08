@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ThemeToggle from "./ThemeToggle";
 
 const NOTIFICATIONS = [
   { title: "New CLI release", detail: "metriq 0.2.0-preview adds duplicate-prompt detection." },
@@ -41,6 +42,8 @@ export default function TopBar({ searchPlaceholder = "Search…", mobileTitle = 
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle />
+
         <div className="relative">
           <button
             className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer opacity-90 hover:opacity-100 flex items-center justify-center w-8 h-8 rounded-full hover:bg-surface-glass relative"

@@ -1,5 +1,6 @@
 import "./globals.css";
 import ToastProvider from "./components/ToastProvider";
+import ThemeProvider from "./components/ThemeProvider";
 
 export const metadata = {
   title: {
@@ -7,7 +8,7 @@ export const metadata = {
     template: "%s — Metriq",
   },
   description:
-    "Terminal-first AI assistant for vibecoders. Metriq analyzes your coding prompts before they reach Cursor or Claude Code, flags broad prompts, estimates token cost, and rewrites vague prompts into focused ones — so you save tokens and keep your AI on target.",
+    "Metriq is an AI coding companion that analyzes your prompts against your real codebase before they reach Claude, ChatGPT, Cursor, or VS Code — flagging broad prompts, estimating token cost, and rewriting vague prompts into focused ones.",
   keywords: [
     "AI coding",
     "token usage",
@@ -15,25 +16,32 @@ export const metadata = {
     "Claude Code",
     "Cursor",
     "developer tools",
-    "CLI",
+    "desktop app",
   ],
   openGraph: {
     title: "Metriq — Focus your prompts, save your tokens",
     description:
-      "Analyze coding prompts before they reach your AI tool. Flag broad prompts, estimate token cost, and rewrite them into focused ones — right in your terminal.",
+      "Analyze coding prompts against your real codebase before they reach your AI tool. Flag broad prompts, estimate token cost, and rewrite them into focused ones.",
     type: "website",
   },
 };
 
 export const viewport = {
-  themeColor: "#0B0F14",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0B0F14" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F7FA" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html className="dark" lang="en">
+    // suppressHydrationWarning: next-themes sets the light/dark class on
+    // <html> via a blocking inline script before hydration (to avoid a
+    // flash of the wrong theme), which legitimately differs from whatever
+    // the server rendered.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link href="https://fonts.googleapis.com" rel="preconnect" />
         <link crossOrigin="" href="https://fonts.gstatic.com" rel="preconnect" />
@@ -47,7 +55,9 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="bg-background text-on-background font-body-md text-body-md antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
