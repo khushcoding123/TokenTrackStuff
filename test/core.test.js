@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { estimateTokens } from "../packages/core/tokenizer.js";
 import { analyzePrompt, ratingFor } from "../packages/core/analyzer.js";
@@ -155,7 +156,9 @@ test("keywordsFromPrompt: drops stopwords and short tokens", () => {
 });
 
 test("listSourceFiles: finds this repo's own engine source files", () => {
-  const files = listSourceFiles(new URL("../packages/core", import.meta.url).pathname);
+  // fileURLToPath (not .pathname) so this works on Windows and paths with spaces:
+  // .pathname yields a leading-slash, %20-encoded string that readdirSync can't open.
+  const files = listSourceFiles(fileURLToPath(new URL("../packages/core", import.meta.url)));
   assert.ok(files.includes("analyzer.js"));
   assert.ok(files.includes("scanner.js"));
   assert.ok(files.every((f) => !f.includes("\\"))); // forward slashes only
