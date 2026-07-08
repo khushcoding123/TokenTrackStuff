@@ -9,26 +9,29 @@ export async function GET(request) {
   const code = request.nextUrl.searchParams.get("insforge_code");
   const oauthError = request.nextUrl.searchParams.get("error");
 
+  const cookieStore = await cookies();
+  const isDesktop = cookieStore.get("insforge_oauth_desktop")?.value === "1";
+  const errorRedirect = (reason) =>
+    NextResponse.redirect(new URL(isDesktop ? `/login?desktop=1&error=${reason}` : `/login?error=${reason}`, request.url));
+
   if (oauthError || !code) {
-    return NextResponse.redirect(new URL("/login?error=oauth_failed", request.url));
+    return errorRedirect("oauth_failed");
   }
 
-  const cookieStore = await cookies();
   const codeVerifier = cookieStore.get("insforge_code_verifier")?.value;
   if (!codeVerifier) {
-    return NextResponse.redirect(new URL("/login?error=missing_verifier", request.url));
+    return errorRedirect("missing_verifier");
   }
 
   const auth = createAuthActions({ cookies: cookieStore });
   const { data, error } = await auth.exchangeOAuthCode(code, codeVerifier);
 
   if (error || !data?.accessToken) {
-    return NextResponse.redirect(new URL("/login?error=exchange_failed", request.url));
+    return errorRedirect("exchange_failed");
   }
 
   cookieStore.delete("insforge_code_verifier");
 
-  const isDesktop = cookieStore.get("insforge_oauth_desktop")?.value === "1";
   if (isDesktop) {
     cookieStore.delete("insforge_oauth_desktop");
     const params = new URLSearchParams({ token: data.accessToken });
