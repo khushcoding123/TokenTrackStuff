@@ -28,6 +28,7 @@ export async function GET(request) {
   }
 
   const codeVerifier = cookieStore.get("insforge_code_verifier")?.value;
+  console.log("[metriq-desktop-debug] /api/auth/callback codeVerifier", { hasCodeVerifier: Boolean(codeVerifier) });
   if (!codeVerifier) {
     return errorRedirect("missing_verifier");
   }
@@ -36,8 +37,17 @@ export async function GET(request) {
   const { data, error } = await auth.exchangeOAuthCode(code, codeVerifier);
 
   if (error || !data?.accessToken) {
+    console.log("[metriq-desktop-debug] /api/auth/callback exchange_failed", {
+      error: error ? { message: error.message, statusCode: error.statusCode, name: error.name } : null,
+      hasAccessToken: Boolean(data?.accessToken),
+    });
     return errorRedirect("exchange_failed");
   }
+
+  console.log("[metriq-desktop-debug] /api/auth/callback exchange_ok", {
+    hasUser: Boolean(data.user),
+    userEmail: data.user?.email,
+  });
 
   cookieStore.delete("insforge_code_verifier");
 
