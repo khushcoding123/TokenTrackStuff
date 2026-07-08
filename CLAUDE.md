@@ -25,7 +25,7 @@ This repo contains three deliverables:
 | `packages/core/` | The **shared engine** (analyze → scan → rewrite) — zero runtime deps, used by the CLI, the web demo, and (soon) the desktop app |
 | `bin/`, `src/` | The **CLI** — published to npm as `metriq`; now a secondary interface, not the focus |
 | `web/` | The **web app** — Next.js 14, deployed to Vercel. Marketing landing page + live `/prompt-studio` demo + auth (shared with the future desktop app) |
-| `desktop/` | The **desktop app** (Electron) — not yet scaffolded; see "Product phases" |
+| `desktop/` | The **desktop app** (Electron) — window/tray/auth, repo linking, and the prompt-capture window are built; see "Product phases" |
 
 ## Live locations
 
@@ -61,20 +61,40 @@ next starts. Status:
   unchanged — the desktop app will reuse this exact auth flow. `/sessions`
   and `/sustainability` still work but are deprioritized (mock data, no
   further design investment for now).
-- ⏳ **Phase 2 (not started):** Electron app shell (`desktop/`) — window, tray
-  icon, app menu, and login via browser handoff (opens the web `/login`,
-  gets a session back through a custom `metriq://` protocol handler, stored
-  via Electron `safeStorage`).
-- ⏳ **Phase 3 (not started):** Repo linking (local folder picker, optionally
-  GitHub OAuth) — runs `packages/core/scanner.js` against the linked
-  folder, persists linked projects via InsForge keyed to the account.
-- ⏳ **Phase 4 (not started):** Tool-preference setting + a global-hotkey
-  floating capture window that runs analyze → scan → rewrite against the
-  linked repo and gives a one-click "copy improved prompt."
-- ⏳ **Phase 5 (research first, not approved):** Live screen/context
-  awareness (accessibility APIs, possibly a companion browser extension for
-  web-based tools). Explicitly gated behind a written feasibility proposal —
-  do not build against this until that proposal is reviewed and approved.
+- ✅ **Phase 2 (desktop shell + auth):** Electron app at `desktop/` — window,
+  tray icon, app menu, `metriq://` protocol registration. Login opens the web
+  `/login?desktop=1` (or `/signup?desktop=1`); on success the web app lands
+  on `/desktop-connected`, which redirects to `metriq://auth-callback?
+  token=...`. The OS hands that back to the app (`open-url` on macOS;
+  `second-instance`/argv on Windows/Linux — see `desktop/src/protocol.js`),
+  which persists the session via `safeStorage` (`desktop/src/auth-store.js`)
+  — never a plain file. Web-side handoff support lives in the same
+  login/signup/google/callback routes as Phase 1's auth, gated behind
+  `desktopHandoff`/`?desktop=1`, not a separate system.
+- ✅ **Phase 3 (repo linking):** "Link a project" in the desktop app's home
+  screen — native folder picker only (GitHub-repo linking, the spec's
+  secondary option, is not implemented). Scans via a new
+  `packages/core/scanner.js#listSourceFiles` export (reuses the existing
+  walk/ignore/extension logic unchanged). Local file-index cache in
+  `userData/project-cache/`; linked-project records synced via a new
+  InsForge `linked_projects` table (see `migrations/`), RLS-scoped so
+  `user_id` defaults to `auth.uid()` server-side — the client never sends
+  or could spoof it. "Active project" selection is local-only
+  (`userData/prefs.json`), not synced.
+- ✅ **Phase 4 (capture MVP):** Tool preference chips (local-only pref, used
+  only to frame feedback text, no live tool integration). `Cmd/Ctrl+Shift+M`
+  (or the in-app button) opens a small always-on-top capture window
+  (`desktop/renderer/capture.*`) that runs `optimize()` +
+  `findRelevantFiles()` from `packages/core` against the active project's
+  real path — same engine, same output as the CLI/`/prompt-studio` — on a
+  debounced keystroke, with one-click copy to clipboard. No screen/window
+  reading of other apps.
+- 📄 **Phase 5 (proposal only, not approved):** see
+  `docs/phase5-screen-awareness-proposal.md`. Recommends, if approved:
+  macOS-only, accessibility-tree reading only (no OCR, no browser
+  extension), VS Code/Cursor only, prototyped via `osascript` shell-out
+  before any native code. **Do not implement anything from that document
+  without explicit approval of its scope first.**
 
 ## Hard rules / conventions
 
@@ -161,6 +181,17 @@ npm install
 npm run dev                   # local dev
 npm run build                 # production build
 
+# Desktop app (from desktop/)
+cd desktop
+npm install
+npm start                                       # launch it
+METRIQ_WEB_URL=http://localhost:3411 npm start  # point login at a local web dev server
+npm test                                        # pure-logic unit tests (protocol URL parsing)
+
+# InsForge backend (from repo root, needs the CLI linked — see .insforge/)
+npx @insforge/cli db migrations new <name>      # new schema change
+npx @insforge/cli db migrations up --all        # apply pending migrations
+
 # Ship
 npm version patch && npm publish        # CLI → npm (from repo root)
 git push origin main                    # web → Vercel auto-deploys
@@ -195,8 +226,13 @@ git push origin main                    # web → Vercel auto-deploys
     Google OAuth (PKCE, via InsForge's shared OAuth callback), session
     refreshed by `web/middleware.js`. See `AGENTS.md` for the InsForge
     project details and which InsForge skills to use for backend changes.
-    **The desktop app reuses this exact web auth flow** (browser handoff),
-    so don't change its shape without checking the desktop-app phase plan.
+    **The desktop app reuses this exact web auth flow.** `/login` and
+    `/signup` accept `?desktop=1`; when set, the login/signup API routes
+    also return a bearer `token`/`refreshToken` (normally cookie-only), and
+    a successful auth lands on `/desktop-connected` instead of `/account` —
+    that page immediately redirects to `metriq://auth-callback?token=...`
+    for the desktop app to pick up. Don't change this shape without checking
+    `desktop/src/protocol.js` and `desktop/README.md`.
   - `/sessions`, `/sustainability` — still work, still mock data, currently
     deprioritized (no further design investment planned right now).
   - `/settings` — persisted prefs (pricing provider, reduced motion) via
@@ -207,6 +243,57 @@ git push origin main                    # web → Vercel auto-deploys
   landing page, which has its own minimal marketing header/footer.
 - `web/app/components/ToastProvider.js` — wraps the whole app in `layout.js`;
   `useToast()` gives any client component a `notify(message)` snackbar.
+
+## Desktop app (`desktop/`)
+
+Own npm project (own `package.json`/`node_modules`), normal dependencies are
+fine here (only `packages/core` and the CLI enforce zero-deps). CommonJS, not
+ESM, throughout `desktop/src/` — Electron's main process is plain Node.
+
+- `desktop/src/main.js` — everything: window/tray/menu creation, `metriq://`
+  protocol registration (with dev-mode argv handling), single-instance lock,
+  all `ipcMain.handle(...)` endpoints. It's one file by design at this size;
+  split it up if it keeps growing rather than before.
+- `desktop/src/protocol.js` — pure, dependency-free parsing of the
+  `metriq://auth-callback` URL and argv scanning. Deliberately separated from
+  Electron APIs so it's unit-testable with plain `node --test` (see
+  `desktop/test/protocol.test.js`) without spinning up a real window.
+- `desktop/src/auth-store.js` — session persistence via `safeStorage`
+  (OS keychain-backed encryption). The file on disk
+  (`<userData>/credentials.enc`) holds only ciphertext, 0600 permissions.
+- `desktop/src/project-cache.js` — local JSON cache of each linked project's
+  file index (`<userData>/project-cache/<id>.json`) — not secret, plain JSON
+  is fine here, unlike auth-store.
+- `desktop/src/prefs.js` — small local-only prefs file (`<userData>/
+  prefs.json`): active project selection, tool preference chips. Deliberately
+  not synced via InsForge — see "Product phases" above for why.
+- `desktop/src/insforge-client.js` — hand-rolled `fetch`-based client for
+  InsForge's PostgREST-style database API (just the `linked_projects` table
+  today), using the stored session's bearer token. Not `@insforge/sdk` — the
+  desktop app only needs a handful of authenticated CRUD calls, and
+  Electron's Node runtime has native `fetch`, so the full SDK isn't worth it
+  yet. **Field names in requests/responses are real Postgres column names
+  (`user_id`, `file_count`), not camelCased** — verified against the live
+  API; don't assume the SDK's camelCase conventions carry over here.
+- `desktop/src/preload.js` — the only bridge between renderer and main
+  (`contextBridge`, `contextIsolation: true`, `nodeIntegration: false`,
+  `sandbox: true` on every `BrowserWindow`). Add new IPC surface here, not by
+  loosening those settings.
+- `desktop/renderer/` — plain HTML/CSS/JS, no build step, no framework.
+  `index.html`/`renderer.js`/`styles.css` are the main window (login →
+  logged-in home with projects + tools + capture button);
+  `capture.html`/`capture.js`/`capture.css` are the floating prompt-capture
+  window. Deliberately not the web app's React/Tailwind stack — Phase 2-4's
+  UI needs didn't justify wiring that in; revisit if/when the desktop UI
+  grows enough to want it.
+- `desktop/src/main.js` imports `packages/core/scanner.js` and
+  `packages/core/rewrite.js` directly by relative path (`../../packages/
+  core/...`) — same "no package-name indirection" choice as the CLI, see
+  "Hard rules" above.
+- `linked_projects` (InsForge table, see `migrations/`): `user_id` defaults
+  to `auth.uid()` server-side (added in a follow-up migration after the
+  table was first created) — the client never sends or could spoof its own
+  user id. RLS is per-user on all four operations, no `anon` policy at all.
 
 ## Deployment gotcha (important)
 
@@ -227,3 +314,15 @@ If a deploy comes back BLOCKED, check the commit author email first.
 - Work the desktop-app pivot phase by phase; don't jump ahead to a phase
   that hasn't been reviewed, and don't start Phase 5 (screen/context
   awareness) implementation without an approved written proposal first.
+- Desktop app changes should be verified with a real Electron launch, not
+  just `node --check`. Playwright's `_electron` API can drive it headlessly
+  (`electron.launch({ executablePath: require("desktop/node_modules/
+  electron"), args: ["desktop"] })`); `main.js` has a
+  `METRIQ_E2E_TEST=1`-gated `global.__metriqTest` hook exposing
+  otherwise-inaccessible main-process functions to Playwright's
+  `electronApplication.evaluate()`, which doesn't have this module's local
+  `require`/closures. Note: calling an IPC method that closes the very
+  window you called it from (e.g. `window.metriq.closeCapture()`) via
+  `page.evaluate()` will always report a "context closed" error even though
+  the call itself succeeds — trigger those from the main-process context
+  (`app.evaluate()` + the test hook) instead.
