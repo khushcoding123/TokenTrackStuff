@@ -26,46 +26,232 @@
         <p class="waiting hidden" id="waiting-msg">Waiting for you to finish in the browser…</p>
       </section>
 
-      <!-- Logged-in view -->
-      <section id="view-home" class="view view-home hidden">
-        <div class="brand">
-          <div class="brand-mark">M</div>
-          <span class="brand-name">Metriq</span>
-        </div>
-        <div class="identity">
-          <div class="avatar">
-            <span id="avatar-initial">?</span>
+      <!-- Logged-in app shell -->
+      <div id="view-home" class="app-shell hidden">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand-mark">M</div>
+            <span class="brand-name">Metriq</span>
           </div>
-          <div>
-            <div id="identity-name" class="identity-name">—</div>
-            <div id="identity-email" class="identity-email muted">—</div>
+          <div class="topbar-identity">
+            <span id="identity-name" class="topbar-name">—</span>
+            <div class="avatar avatar-sm">
+              <span id="avatar-initial">?</span>
+            </div>
           </div>
+        </header>
+
+        <div class="page-content">
+          <!-- Overview -->
+          <section id="page-overview" class="page">
+            <h1 class="page-title">Overview</h1>
+
+            <div class="stat-grid">
+              <div class="stat-card">
+                <span class="stat-value" id="stat-captures">0</span>
+                <span class="stat-label">Prompts checked</span>
+              </div>
+              <div class="stat-card stat-card-accent">
+                <span class="stat-value" id="stat-tokens-saved">0</span>
+                <span class="stat-label">Tokens saved</span>
+              </div>
+            </div>
+
+            <button id="btn-open-capture" class="btn btn-primary capture-cta">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+              </svg>
+              Check a prompt
+              <span id="capture-hotkey-label" class="capture-hotkey-label"></span>
+            </button>
+
+            <div class="section-block">
+              <div class="section-header">
+                <h2>Active project</h2>
+                <button id="btn-goto-projects" class="link-btn">Manage</button>
+              </div>
+              <div id="overview-active-project" class="active-project-card">
+                <p class="muted empty-note">No project linked yet.</p>
+              </div>
+            </div>
+
+            <div class="section-block">
+              <div class="section-header">
+                <h2>Recent activity</h2>
+              </div>
+              <ul id="recent-activity-list" class="activity-list"></ul>
+              <p id="recent-activity-empty" class="muted empty-note">
+                Nothing yet — check a prompt to see it here.
+              </p>
+            </div>
+          </section>
+
+          <!-- Projects -->
+          <section id="page-projects" class="page hidden">
+            <div class="page-header-row">
+              <h1 class="page-title">Projects</h1>
+              <button id="btn-link-project" class="pill-action">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Link a project
+              </button>
+            </div>
+            <p class="muted page-subtitle">
+              Local folders Metriq scans so it can check your prompts against real files.
+            </p>
+            <p id="projects-error" class="error-text hidden"></p>
+            <ul id="projects-list" class="projects-list"></ul>
+            <div id="projects-empty" class="empty-state hidden">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+              </svg>
+              <p class="muted">No projects linked yet. Link a local folder so Metriq can check your prompts against it.</p>
+            </div>
+          </section>
+
+          <!-- Tools -->
+          <section id="page-tools" class="page hidden">
+            <h1 class="page-title">Tools you use</h1>
+            <p class="muted page-subtitle">Used to frame feedback — no live integration yet.</p>
+            <div id="tools-list" class="tools-list"></div>
+          </section>
+
+          <!-- Sustainability -->
+          <section id="page-sustainability" class="page hidden">
+            <h1 class="page-title">Sustainability</h1>
+            <p class="muted page-subtitle">
+              Real numbers from prompts you've checked on this device — fewer exploration tokens sent means less
+              compute burned per request.
+            </p>
+
+            <div class="stat-grid stat-grid-3">
+              <div class="stat-card">
+                <span class="stat-value" id="sustain-captures">0</span>
+                <span class="stat-label">Prompts optimized</span>
+              </div>
+              <div class="stat-card stat-card-accent">
+                <span class="stat-value" id="sustain-tokens-saved">0</span>
+                <span class="stat-label">Tokens saved</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value" id="sustain-avg-pct">0%</span>
+                <span class="stat-label">Avg. reduction</span>
+              </div>
+            </div>
+
+            <div id="sustain-empty" class="empty-state hidden">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 20A7 7 0 0 1 4 13c0-4 3-9 10-11 1 6 1 10-1 13a6.97 6.97 0 0 1-2 5Z" />
+                <path d="M9.5 14.5 18 6" />
+              </svg>
+              <p class="muted">No prompts checked yet — your savings will show up here once you do.</p>
+            </div>
+
+            <div id="sustain-history-block" class="section-block hidden">
+              <div class="section-header">
+                <h2>Recent optimizations</h2>
+              </div>
+              <ul id="sustain-history-list" class="activity-list"></ul>
+            </div>
+          </section>
+
+          <!-- Settings -->
+          <section id="page-settings" class="page hidden">
+            <h1 class="page-title">Settings</h1>
+
+            <div class="settings-card">
+              <div class="identity">
+                <div class="avatar">
+                  <span id="settings-avatar-initial">?</span>
+                </div>
+                <div class="identity-info">
+                  <div id="settings-name-display" class="identity-name-row">
+                    <span id="settings-identity-name" class="identity-name">—</span>
+                    <button id="btn-edit-name" class="icon-btn" aria-label="Edit display name" title="Edit display name">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <form id="settings-name-form" class="settings-name-form hidden">
+                    <input id="settings-name-input" class="settings-name-input" type="text" maxlength="100" autocomplete="off" />
+                    <button type="submit" class="pill-action">Save</button>
+                    <button type="button" id="btn-cancel-name" class="link-btn">Cancel</button>
+                  </form>
+                  <div id="settings-identity-email" class="identity-email muted">—</div>
+                </div>
+              </div>
+              <p id="settings-name-error" class="error-text hidden"></p>
+            </div>
+            <p class="muted settings-account-note">
+              Email and password are managed on your account — sign-in method changes aren't supported from here yet.
+            </p>
+
+            <div class="settings-list">
+              <div class="settings-row">
+                <span class="settings-row-label">Appearance</span>
+                <button id="btn-toggle-theme" class="theme-toggle-btn">
+                  <svg id="theme-toggle-icon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></svg>
+                  <span id="theme-toggle-label">Dark</span>
+                </button>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Capture hotkey</span>
+                <span id="settings-hotkey-label" class="settings-row-value"></span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Version</span>
+                <span class="settings-row-value">0.1.0</span>
+              </div>
+            </div>
+
+            <button id="btn-logout" class="btn btn-danger-outline">Log out</button>
+          </section>
         </div>
 
-        <button id="btn-open-capture" class="btn btn-primary capture-cta">
-          Check a prompt <span id="capture-hotkey-label" class="capture-hotkey-label"></span>
-        </button>
-
-        <div class="projects-section">
-          <div class="projects-header">
-            <h2>Projects</h2>
-            <button id="btn-link-project" class="btn-link">+ Link a project</button>
-          </div>
-          <p id="projects-error" class="error-text hidden"></p>
-          <ul id="projects-list" class="projects-list"></ul>
-          <p id="projects-empty" class="muted projects-empty hidden">
-            No projects linked yet. Link a local folder so Metriq can check your prompts against it.
-          </p>
-        </div>
-
-        <div class="tools-section">
-          <h2>Tools you use</h2>
-          <p class="muted">Used to frame feedback — no live integration yet.</p>
-          <div id="tools-list" class="tools-list"></div>
-        </div>
-
-        <button id="btn-logout" class="btn btn-secondary btn-logout">Log out</button>
-      </section>
+        <nav class="bottom-nav">
+          <button class="nav-btn is-active" data-page="overview" aria-label="Overview">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 10.5 12 3l9 7.5" />
+              <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+            </svg>
+            <span>Overview</span>
+          </button>
+          <button class="nav-btn" data-page="projects" aria-label="Projects">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+            </svg>
+            <span>Projects</span>
+          </button>
+          <button class="nav-btn" data-page="tools" aria-label="Tools">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 6h6M14 6h6M4 12h10M18 12h2M4 18h2M10 18h10" />
+              <circle cx="12" cy="6" r="2" />
+              <circle cx="16" cy="12" r="2" />
+              <circle cx="8" cy="18" r="2" />
+            </svg>
+            <span>Tools</span>
+          </button>
+          <button class="nav-btn" data-page="sustainability" aria-label="Sustainability">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 20A7 7 0 0 1 4 13c0-4 3-9 10-11 1 6 1 10-1 13a6.97 6.97 0 0 1-2 5Z" />
+              <path d="M9.5 14.5 18 6" />
+            </svg>
+            <span>Impact</span>
+          </button>
+          <button class="nav-btn" data-page="settings" aria-label="Settings">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+              />
+            </svg>
+            <span>Settings</span>
+          </button>
+        </nav>
+      </div>
     </main>
     <script src="renderer.js"></script>
   </body>

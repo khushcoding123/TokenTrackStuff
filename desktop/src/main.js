@@ -4,6 +4,7 @@ const { saveSession, loadSession, clearSession } = require("./auth-store");
 const { PROTOCOL, findProtocolUrlInArgv, parseAuthCallbackUrl } = require("./protocol");
 const { saveFileIndex, loadFileIndex, removeFileIndex } = require("./project-cache");
 const { loadPrefs, savePrefs } = require("./prefs");
+const { recordCapture, getSummary } = require("./usage-stats");
 const insforge = require("./insforge-client");
 const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scanner.js");
 const { optimize } = require("../../packages/core/rewrite.js");
@@ -69,10 +70,10 @@ function createWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 640,
-    minWidth: 360,
-    minHeight: 480,
+    width: 480,
+    height: 760,
+    minWidth: 380,
+    minHeight: 560,
     backgroundColor: "#0B0F14",
     title: "Metriq",
     icon: path.join(__dirname, "..", "renderer", "assets", "icon.png"),
@@ -362,6 +363,24 @@ if (!gotSingleInstanceLock) {
     return true;
   });
 
+  // Display name is the only account field editable from the desktop app:
+  // InsForge has no endpoint for changing account email, and password
+  // change needs the email-OTP reset flow (requires SMTP configured
+  // server-side, not yet set up for this project). See insforge-client.js.
+  ipcMain.handle("account:update-name", async (_event, name) => {
+    const session = loadSession();
+    if (!session?.token) {
+      const err = new Error("Not logged in.");
+      err.code = "NOT_AUTHENTICATED";
+      throw err;
+    }
+    await insforge.updateProfile(session.token, { name });
+    const updated = { ...session, name };
+    saveSession(updated);
+    updateTrayMenu();
+    return updated;
+  });
+
   // --- Project linking --------------------------------------------------
 
   function requireToken() {
@@ -450,6 +469,15 @@ if (!gotSingleInstanceLock) {
     return true;
   });
 
+  // --- Theme preference ---------------------------------------------------
+
+  ipcMain.handle("prefs:get-theme", () => loadPrefs().theme ?? "dark");
+
+  ipcMain.handle("prefs:set-theme", (_event, theme) => {
+    savePrefs({ theme });
+    return true;
+  });
+
   // --- Prompt capture window ----------------------------------------------
 
   ipcMain.handle("capture:open", () => {
@@ -482,8 +510,16 @@ if (!gotSingleInstanceLock) {
     };
   });
 
-  ipcMain.handle("capture:copy", (_event, text) => {
+  ipcMain.handle("capture:copy", (_event, text, stats) => {
     clipboard.writeText(text);
+    if (stats) {
+      const activeProject = loadPrefs().activeProject;
+      recordCapture({ ...stats, projectName: activeProject?.name ?? null });
+    }
     return true;
   });
+
+  // --- Usage stats (Overview / Sustainability pages) ---------------------
+
+  ipcMain.handle("stats:get-summary", () => getSummary());
 }

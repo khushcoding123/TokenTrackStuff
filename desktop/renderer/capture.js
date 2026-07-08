@@ -14,6 +14,7 @@
 
   let debounceTimer = null;
   let latestFocusedPrompt = "";
+  let latestStats = null;
 
   function renderResult(result) {
     resultEl.classList.remove("hidden");
@@ -31,11 +32,19 @@
 
     focusedEl.textContent = result.focusedPrompt;
     latestFocusedPrompt = result.focusedPrompt;
+    latestStats = {
+      promptTokens: result.promptTokens,
+      projectedTokens: result.projectedTokens,
+      savedTokens: result.savedTokens,
+      savedPct: result.savedPct,
+      rating: result.rating,
+    };
   }
 
   function clearResult() {
     resultEl.classList.add("hidden");
     latestFocusedPrompt = "";
+    latestStats = null;
   }
 
   input.addEventListener("input", () => {
@@ -53,7 +62,7 @@
 
   btnCopy.addEventListener("click", async () => {
     if (!latestFocusedPrompt) return;
-    await window.metriq.copyToClipboard(latestFocusedPrompt);
+    await window.metriq.copyToClipboard(latestFocusedPrompt, latestStats);
     btnCopy.textContent = "Copied!";
     setTimeout(() => {
       btnCopy.textContent = "Copy improved prompt";

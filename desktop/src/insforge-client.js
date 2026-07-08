@@ -64,4 +64,25 @@ function deleteLinkedProject(token, id) {
   return request("DELETE", `/api/database/records/${TABLE}?id=eq.${encodeURIComponent(id)}`, { token });
 }
 
-module.exports = { listLinkedProjects, createLinkedProject, updateLinkedProject, deleteLinkedProject };
+// Account profile — separate from the linked_projects table above, hits
+// InsForge's auth API (not the PostgREST-style database API). Per InsForge's
+// schema, PATCH /api/auth/profiles/current expects a wrapped
+// { profile: {...} } body and returns { id, profile }. Only `name` is
+// editable from the desktop app today — InsForge has no endpoint for
+// changing account email, and password change requires the email-OTP reset
+// flow (needs SMTP configured server-side first, not yet done for this
+// project).
+async function updateProfile(token, profile) {
+  return request("PATCH", "/api/auth/profiles/current", {
+    token,
+    body: { profile },
+  });
+}
+
+module.exports = {
+  listLinkedProjects,
+  createLinkedProject,
+  updateLinkedProject,
+  deleteLinkedProject,
+  updateProfile,
+};

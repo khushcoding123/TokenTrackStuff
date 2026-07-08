@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("metriq", {
   openLogin: () => ipcRenderer.invoke("auth:open-login"),
   openSignup: () => ipcRenderer.invoke("auth:open-signup"),
   logout: () => ipcRenderer.invoke("auth:logout"),
+  updateDisplayName: (name) => ipcRenderer.invoke("account:update-name", name),
   onAuthSuccess: (callback) => {
     const listener = (_event, session) => callback(session);
     ipcRenderer.on("auth:success", listener);
@@ -37,9 +38,14 @@ contextBridge.exposeInMainWorld("metriq", {
   getTools: () => ipcRenderer.invoke("prefs:get-tools"),
   setTools: (tools) => ipcRenderer.invoke("prefs:set-tools", tools),
 
+  getTheme: () => ipcRenderer.invoke("prefs:get-theme"),
+  setTheme: (theme) => ipcRenderer.invoke("prefs:set-theme", theme),
+
   openCapture: () => ipcRenderer.invoke("capture:open"),
   closeCapture: () => ipcRenderer.invoke("capture:close"),
   getCaptureContext: () => ipcRenderer.invoke("capture:get-context"),
   analyzePrompt: (prompt) => ipcRenderer.invoke("capture:analyze", prompt),
-  copyToClipboard: (text) => ipcRenderer.invoke("capture:copy", text),
+  copyToClipboard: (text, stats) => ipcRenderer.invoke("capture:copy", text, stats),
+
+  getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
 });
