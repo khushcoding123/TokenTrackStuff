@@ -14,6 +14,7 @@ const FOOTER_ITEMS = [
     external: true,
   },
   { key: "support", label: "Support", href: "mailto:kotharikhush0@gmail.com", icon: "help" },
+  { key: "account", label: "Account", href: "/account", icon: "account_circle" },
   { key: "settings", label: "Settings", href: "/settings", icon: "settings" },
 ];
 
