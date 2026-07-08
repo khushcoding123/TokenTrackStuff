@@ -3,6 +3,7 @@
 import { runAnalyze } from "./commands/analyze.js";
 import { runStart } from "./commands/start.js";
 import { runStats, runHistory, runReset } from "./commands/stats.js";
+import { runTrace } from "./commands/trace.js";
 import { colors } from "./ui/colors.js";
 import { banner } from "./ui/format.js";
 import { PROVIDERS, DEFAULT_PROVIDER } from "../packages/core/config.js";
@@ -43,6 +44,8 @@ ${c.bold("USAGE")}
 
 ${c.bold("COMMANDS")}
   ${c.cyan("start")}                 Launch the interactive terminal companion (REPL)
+  ${c.cyan("trace")}                 Start token tracking: read your AI agents' usage and
+                        open a live localhost dashboard
   ${c.cyan("analyze")} ${c.gray('"<prompt>"')}   Analyze a single prompt and suggest a focused rewrite
   ${c.cyan("stats")}                 Show token-savings analytics for this session
   ${c.cyan("history")}               List every prompt analyzed this session
@@ -84,6 +87,8 @@ export function run(argv = process.argv.slice(2)) {
     }
     case "start":
       return runStart(flags);
+    case "trace":
+      return runTrace(flags);
     case "stats":
       return runStats(flags);
     case "history":
