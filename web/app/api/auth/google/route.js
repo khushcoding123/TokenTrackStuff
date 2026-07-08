@@ -10,11 +10,14 @@ export async function GET(request) {
   const isDesktop = request.nextUrl.searchParams.get("desktop") === "1";
   const errorRedirect = isDesktop ? "/login?desktop=1&error=oauth_start_failed" : "/login?error=oauth_start_failed";
 
-  // Primary signal: encode the flag directly into the redirectTo URL we hand
-  // InsForge. InsForge relays this exact string through its own OAuth state
-  // (Google -> api.insforge.dev -> <project>.insforge.app -> back to us),
-  // so it survives that chain by construction instead of depending on a
-  // cookie surviving in parallel across three third-party hops.
+  // redirectTo must exactly match an entry in InsForge's allowed-redirect-
+  // URLs list (registered via insforge.toml [auth].allowed_redirect_urls) —
+  // an unregistered query string makes signInWithOAuth reject it with
+  // INVALID_INPUT (confirmed via a live test). Both the bare callback and
+  // the ?desktop=1 variant are registered, so this is safe. InsForge relays
+  // this exact string verbatim through its Google -> api.insforge.dev ->
+  // <project>.insforge.app -> back-to-us hop chain (confirmed by decoding
+  // its own state JWT), so the flag survives that chain by construction.
   const callbackPath = isDesktop ? "/api/auth/callback?desktop=1" : "/api/auth/callback";
   const redirectTo = new URL(callbackPath, process.env.NEXT_PUBLIC_APP_URL).toString();
   console.log("[metriq-desktop-debug] /api/auth/google", { isDesktop, redirectTo });

@@ -4,6 +4,8 @@ allowed_redirect_urls = [
   "http://localhost:3000/login",
   "https://tokenpilot-mocha.vercel.app/api/auth/callback",
   "https://tokenpilot-mocha.vercel.app/login",
+  "http://localhost:3000/api/auth/callback?desktop=1",
+  "https://tokenpilot-mocha.vercel.app/api/auth/callback?desktop=1",
 ]
 require_email_verification = false
 verify_email_method = "code"
