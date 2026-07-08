@@ -54,10 +54,10 @@ export default function DesktopConnectedClient() {
       <div className="w-12 h-12 rounded-full bg-primary/15 border border-border-subtle flex items-center justify-center text-primary">
         <span className="material-symbols-outlined">check_circle</span>
       </div>
-      <h2 className="font-headline-lg text-headline-lg text-on-background">You're signed in</h2>
+      <h2 className="font-headline-lg text-headline-lg text-on-background">You've successfully logged in</h2>
       <p className="font-body-sm text-body-sm text-on-surface-variant">
-        Click below to finish connecting the Metriq app — browsers generally require a click to hand off to a
-        desktop app, so this step doesn't happen automatically. You can close this tab afterward.
+        Taking you back to the Metriq desktop app now. You can close this tab once it opens — if nothing happens
+        after a few seconds, click below to finish connecting.
       </p>
       {callbackUrl && (
         <a

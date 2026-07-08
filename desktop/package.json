@@ -8,7 +8,9 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "package:mac": "electron-builder --mac --dir"
+    "package:mac": "electron-builder --mac --dir",
+    "package:win": "electron-builder --win nsis",
+    "package:linux": "electron-builder --linux AppImage"
   },
   "devDependencies": {
     "electron": "^43.1.0",
@@ -20,10 +22,27 @@
     "productName": "Metriq",
     "files": ["src/**/*", "renderer/**/*", "package.json"],
     "extraResources": [{ "from": "../packages/core", "to": "packages/core" }],
+    "protocols": {
+      "name": "Metriq Auth Callback",
+      "schemes": ["metriq"]
+    },
     "mac": {
       "icon": "renderer/assets/icon.icns",
       "category": "public.app-category.developer-tools",
       "target": "dir"
+    },
+    "win": {
+      "icon": "renderer/assets/icon.png",
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "icon": "renderer/assets/icon.png",
+      "category": "Development",
+      "target": ["AppImage"]
     }
   }
 }
