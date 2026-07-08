@@ -1,0 +1,16 @@
+{
+  "name": "metriq-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Metriq desktop app — links a project, drafts prompts, and analyzes them against the real codebase before you send them to Claude, ChatGPT, Cursor, or VS Code.",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "electron": "^43.1.0"
+  },
+  "license": "MIT"
+}

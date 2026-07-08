@@ -1,0 +1,171 @@
+:root {
+  --background: #0b0f14;
+  --surface: #131a22;
+  --surface-container: #1c2b3c;
+  --border: #1f2937;
+  --on-background: #d4e4fa;
+  --on-surface-variant: #bccbb9;
+  --primary: #4be277;
+  --on-primary: #003915;
+  --error: #ffb4ab;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--on-background);
+  font-family: -apple-system, "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 28px;
+  text-align: center;
+  gap: 12px;
+}
+
+.view.hidden {
+  display: none;
+}
+
+.brand {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.brand-name {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+h1 {
+  font-size: 19px;
+  margin: 8px 0 0;
+}
+
+h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.muted {
+  color: var(--on-surface-variant);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.btn {
+  width: 100%;
+  max-width: 260px;
+  padding: 11px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s ease;
+}
+
+.btn:hover {
+  opacity: 0.85;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  margin-top: 14px;
+}
+
+.btn-secondary {
+  background: rgba(75, 226, 119, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.waiting {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  margin-top: 8px;
+}
+
+.waiting.hidden {
+  display: none;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  text-align: left;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(75, 226, 119, 0.15);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.identity-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.identity-email {
+  font-size: 12px;
+}
+
+.card {
+  width: 100%;
+  max-width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: left;
+  margin: 8px 0;
+}

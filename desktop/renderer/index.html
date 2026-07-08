@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>Metriq</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <!-- Logged-out view -->
+      <section id="view-login" class="view">
+        <div class="brand">
+          <div class="brand-mark">M</div>
+          <span class="brand-name">Metriq</span>
+        </div>
+        <h1>Sign in to get started</h1>
+        <p class="muted">
+          Metriq opens your browser to sign in securely, then hands control back here automatically.
+        </p>
+        <button id="btn-login" class="btn btn-primary">Log in</button>
+        <button id="btn-signup" class="btn btn-secondary">Create an account</button>
+        <p class="waiting hidden" id="waiting-msg">Waiting for you to finish in the browser…</p>
+      </section>
+
+      <!-- Logged-in view -->
+      <section id="view-home" class="view hidden">
+        <div class="brand">
+          <div class="brand-mark">M</div>
+          <span class="brand-name">Metriq</span>
+        </div>
+        <div class="identity">
+          <div class="avatar">
+            <span id="avatar-initial">?</span>
+          </div>
+          <div>
+            <div id="identity-name" class="identity-name">—</div>
+            <div id="identity-email" class="identity-email muted">—</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>You're connected</h2>
+          <p class="muted">
+            Repo linking and the prompt capture window are coming in the next update. For now, this confirms your
+            account is connected and your session is stored securely on this device.
+          </p>
+        </div>
+        <button id="btn-logout" class="btn btn-secondary">Log out</button>
+      </section>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>
