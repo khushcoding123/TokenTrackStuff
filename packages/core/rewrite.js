@@ -31,10 +31,14 @@ function normalizeIntent(prompt) {
  * @param {object} analysis  result from analyzePrompt()
  * @param {object} [opts]
  * @param {string[]} [opts.relevantFiles]  files surfaced by the scanner
+ * @param {object} [opts.projectContext] richer scan result
  * @returns {{ text: string, notes: string[] }}
  */
 export function buildFocusedPrompt(analysis, opts = {}) {
-  const relevantFiles = opts.relevantFiles || [];
+  const projectContext = opts.projectContext || {};
+  const relevantFiles = projectContext.files || opts.relevantFiles || [];
+  const confidence = projectContext.confidence || (relevantFiles.length ? "medium" : "low");
+  const subsystem = projectContext.subsystem || "";
   const has = (id) => analysis.issues.some((i) => i.id === id);
   const parts = [];
 
@@ -43,11 +47,16 @@ export function buildFocusedPrompt(analysis, opts = {}) {
 
   // 2. Give the assistant a concrete starting point.
   if (!analysis.hasFileRef) {
-    if (relevantFiles.length) {
+    if (relevantFiles.length && confidence !== "low") {
       const list = relevantFiles.map((f) => `\`${f}\``).join(", ");
-      parts.push(`Check ${list}.`);
+      parts.push(`Start with ${list}.`);
+      if (subsystem) {
+        parts.push(`This likely lives in the ${subsystem} flow.`);
+      }
     } else {
-      parts.push("Name the 1-3 files or symbols involved.");
+      parts.push(
+        "I couldn't confidently identify the responsible files from the repo scan. Name the screen, route, error, or symbol involved."
+      );
     }
   }
 
