@@ -72,7 +72,7 @@ export default function SignupForm() {
         return;
       }
 
-      const next = searchParams.get("next") || "/account";
+      const next = searchParams.get("next") || "/usage";
       router.push(next);
       router.refresh();
     } catch {

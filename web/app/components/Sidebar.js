@@ -1,9 +1,9 @@
 const NAV_ITEMS = [
-  { key: "overview", label: "Overview", href: "/", icon: "dashboard" },
+  { key: "usage", label: "Dashboard", href: "/usage", icon: "space_dashboard" },
   { key: "prompt-studio", label: "Prompt Studio", href: "/prompt-studio", icon: "bolt" },
-  { key: "usage", label: "Usage", href: "/usage", icon: "monitoring" },
   { key: "sessions", label: "Sessions", href: "/sessions", icon: "history" },
   { key: "sustainability", label: "Sustainability", href: "/sustainability", icon: "eco" },
+  { key: "overview", label: "Landing page", href: "/", icon: "home" },
 ];
 
 const FOOTER_ITEMS = [
