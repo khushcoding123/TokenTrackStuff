@@ -13,7 +13,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { dollarsFor, DEFAULT_PROVIDER } from "../config.js";
+import { dollarsFor, DEFAULT_PROVIDER } from "../../packages/core/config.js";
 
 const DIR = join(homedir(), ".metriq");
 const FILE = join(DIR, "session.json");

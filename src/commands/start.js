@@ -8,12 +8,12 @@
 // on launch. Analysis and tracking work fully offline today.)
 
 import readline from "node:readline";
-import { optimize } from "../core/rewrite.js";
-import { findRelevantFiles } from "../core/scanner.js";
+import { optimize } from "../../packages/core/rewrite.js";
+import { findRelevantFiles } from "../../packages/core/scanner.js";
 import { renderAnalysis, banner, num, money } from "../ui/format.js";
 import { colors } from "../ui/colors.js";
 import { load, record, summarize } from "../core/session.js";
-import { DEFAULT_PROVIDER } from "../config.js";
+import { DEFAULT_PROVIDER } from "../../packages/core/config.js";
 
 export function runStart(flags = {}) {
   const provider = flags.provider || DEFAULT_PROVIDER;

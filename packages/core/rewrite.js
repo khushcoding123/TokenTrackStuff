@@ -12,7 +12,7 @@ import { estimateTokens } from "./tokenizer.js";
 import {
   MAX_EXPLORATION_TOKENS,
   MIN_EXPLORATION_TOKENS,
-} from "../config.js";
+} from "./config.js";
 
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);

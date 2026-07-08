@@ -2,10 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { estimateTokens } from "../src/core/tokenizer.js";
-import { analyzePrompt, ratingFor } from "../src/core/analyzer.js";
-import { optimize, buildFocusedPrompt } from "../src/core/rewrite.js";
-import { keywordsFromPrompt } from "../src/core/scanner.js";
+import { estimateTokens } from "../packages/core/tokenizer.js";
+import { analyzePrompt, ratingFor } from "../packages/core/analyzer.js";
+import { optimize, buildFocusedPrompt } from "../packages/core/rewrite.js";
+import { keywordsFromPrompt } from "../packages/core/scanner.js";
 
 test("estimateTokens: empty and non-empty", () => {
   assert.equal(estimateTokens(""), 0);

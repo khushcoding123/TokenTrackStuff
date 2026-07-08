@@ -2,12 +2,12 @@
 // rewrite. Supports --json for programmatic use and --no-scan to skip the disk
 // scan.
 
-import { optimize } from "../core/rewrite.js";
-import { findRelevantFiles } from "../core/scanner.js";
+import { optimize } from "../../packages/core/rewrite.js";
+import { findRelevantFiles } from "../../packages/core/scanner.js";
 import { renderAnalysis, banner } from "../ui/format.js";
 import { colors } from "../ui/colors.js";
 import { record } from "../core/session.js";
-import { DEFAULT_PROVIDER } from "../config.js";
+import { DEFAULT_PROVIDER } from "../../packages/core/config.js";
 
 export function runAnalyze(prompt, flags = {}) {
   if (!prompt || !prompt.trim()) {

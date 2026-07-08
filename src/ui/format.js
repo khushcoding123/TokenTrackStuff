@@ -1,7 +1,7 @@
 // Terminal rendering for metriq. Boxes, bars, and the analysis report.
 
 import { colors, severityColor } from "./colors.js";
-import { dollarsFor } from "../config.js";
+import { dollarsFor } from "../../packages/core/config.js";
 
 const RATING_STYLE = {
   focused: { color: colors.green, icon: "✓", label: "FOCUSED" },

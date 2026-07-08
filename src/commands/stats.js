@@ -5,7 +5,7 @@
 import { load, summarize, reset as resetSession, SESSION_FILE } from "../core/session.js";
 import { colors } from "../ui/colors.js";
 import { banner, num, money, bar } from "../ui/format.js";
-import { DEFAULT_PROVIDER, PROVIDERS } from "../config.js";
+import { DEFAULT_PROVIDER, PROVIDERS } from "../../packages/core/config.js";
 
 function truncate(s, n = 52) {
   s = String(s).replace(/\s+/g, " ");

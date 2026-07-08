@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { analyzePrompt } from "../../../src/core/analyzer.js";
-import { optimize } from "../../../src/core/rewrite.js";
-import { PROVIDERS, DEFAULT_PROVIDER, dollarsFor } from "../../../src/config.js";
+import { analyzePrompt } from "../../../packages/core/analyzer.js";
+import { optimize } from "../../../packages/core/rewrite.js";
+import { PROVIDERS, DEFAULT_PROVIDER, dollarsFor } from "../../../packages/core/config.js";
 import { useToast } from "../components/ToastProvider";
 import EditorPanel from "./EditorPanel";
 

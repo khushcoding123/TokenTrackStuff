@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Terminal-first AI assistant that analyzes coding prompts before they reach AI tools, flags broad prompts, estimates token cost, and rewrites vague prompts into focused ones.",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "metriq": "bin/tokenpilot.js"
   },
@@ -18,6 +21,7 @@
   "files": [
     "bin",
     "src",
+    "packages/core",
     "README.md"
   ],
   "keywords": [

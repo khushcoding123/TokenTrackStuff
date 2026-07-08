@@ -11,7 +11,7 @@ import { estimateTokens } from "./tokenizer.js";
 import {
   MAX_EXPLORATION_TOKENS,
   MIN_EXPLORATION_TOKENS,
-} from "../config.js";
+} from "./config.js";
 
 // --- Signal dictionaries ----------------------------------------------------
 

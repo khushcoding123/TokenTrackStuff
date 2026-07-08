@@ -1,0 +1,8 @@
+{
+  "name": "@metriq/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared prompt-analysis engine (analyze → scan → rewrite) used by the metriq CLI, web app, and desktop app. Zero runtime dependencies.",
+  "license": "MIT"
+}

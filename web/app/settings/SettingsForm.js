@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PROVIDERS, DEFAULT_PROVIDER } from "../../../src/config.js";
+import { PROVIDERS, DEFAULT_PROVIDER } from "../../../packages/core/config.js";
 import { useToast } from "../components/ToastProvider";
 
 const PROVIDER_KEY = "metriq:provider";

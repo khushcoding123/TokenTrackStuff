@@ -5,7 +5,7 @@ import { runStart } from "./commands/start.js";
 import { runStats, runHistory, runReset } from "./commands/stats.js";
 import { colors } from "./ui/colors.js";
 import { banner } from "./ui/format.js";
-import { PROVIDERS, DEFAULT_PROVIDER } from "./config.js";
+import { PROVIDERS, DEFAULT_PROVIDER } from "../packages/core/config.js";
 
 const VERSION = "0.1.0";
 
