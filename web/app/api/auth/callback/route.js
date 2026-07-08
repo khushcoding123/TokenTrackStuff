@@ -36,25 +36,31 @@ export async function GET(request) {
   const auth = createAuthActions({ cookies: cookieStore });
   const { data, error } = await auth.exchangeOAuthCode(code, codeVerifier);
 
-  if (error || !data?.accessToken) {
+  // createAuthActions() strips accessToken/refreshToken out of `data` by
+  // design (see sanitizeAuthData in @insforge/sdk/ssr) — it writes them into
+  // insforge_access_token/insforge_refresh_token cookies instead. `data.user`
+  // is the only reliable success signal here; the real token (needed only
+  // for the desktop handoff) is read back from the cookie below.
+  if (error || !data?.user) {
     console.log("[metriq-desktop-debug] /api/auth/callback exchange_failed", {
       error: error ? { message: error.message, statusCode: error.statusCode, name: error.name } : null,
-      hasAccessToken: Boolean(data?.accessToken),
+      hasUser: Boolean(data?.user),
     });
     return errorRedirect("exchange_failed");
   }
-
-  console.log("[metriq-desktop-debug] /api/auth/callback exchange_ok", {
-    hasUser: Boolean(data.user),
-    userEmail: data.user?.email,
-  });
 
   cookieStore.delete("insforge_code_verifier");
 
   if (isDesktop) {
     cookieStore.delete("insforge_oauth_desktop");
-    const params = new URLSearchParams({ token: data.accessToken });
-    if (data.refreshToken) params.set("refresh_token", data.refreshToken);
+    const token = cookieStore.get("insforge_access_token")?.value;
+    console.log("[metriq-desktop-debug] /api/auth/callback exchange_ok", { hasToken: Boolean(token) });
+    if (!token) {
+      return errorRedirect("exchange_failed");
+    }
+    const params = new URLSearchParams({ token });
+    const refreshToken = cookieStore.get("insforge_refresh_token")?.value;
+    if (refreshToken) params.set("refresh_token", refreshToken);
     params.set("email", data.user.email);
     if (data.user.profile?.name) params.set("name", data.user.profile.name);
     return NextResponse.redirect(new URL(`/desktop-connected?${params.toString()}`, request.url));
