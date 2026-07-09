@@ -26,7 +26,11 @@
   --color-error-container: 147 0 10;
   --color-tertiary-container: 239 153 0;
   --color-inverse-surface: 212 228 250;
-  --color-on-surface-variant: 188 203 185;
+  /* Was 188 203 185 — too dim against the dark surfaces (uppercase card
+     labels, captions, step descriptions were hard to read). Matches
+     --color-on-surface/--color-on-background now; light mode is untouched
+     since grey-on-white already has plenty of contrast there. */
+  --color-on-surface-variant: 212 228 250;
   --color-on-tertiary-fixed: 42 23 0;
   --color-secondary-container: 5 102 217;
   --color-primary-fixed: 107 255 143;

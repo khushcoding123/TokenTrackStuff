@@ -59,7 +59,7 @@ export default function LandingPage() {
             or VS Code, flagging what's too broad and rewriting it into something focused, so your AI tool
             doesn't waste tokens searching the whole project.
           </p>
-          <div className="flex flex-col sm:flex-row items-center gap-4 mt-2">
+          <div className="flex flex-col items-center gap-4 mt-2">
             <a
               className="bg-primary text-on-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:opacity-90 transition-all duration-300 flex items-center gap-2"
               href={RELEASES_URL}
@@ -69,10 +69,24 @@ export default function LandingPage() {
               <span className="material-symbols-outlined text-[18px]">download</span>
               Download for macOS
             </a>
+            <div className="flex items-center gap-4">
+              {[
+                { os: "Windows", icon: "desktop_windows" },
+                { os: "Linux", icon: "dns" },
+              ].map((d) => (
+                <a
+                  key={d.os}
+                  className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1.5"
+                  href={RELEASES_URL}
+                  rel="noreferrer noopener"
+                  target="_blank"
+                >
+                  <span className="material-symbols-outlined text-[16px]">{d.icon}</span>
+                  Download for {d.os}
+                </a>
+              ))}
+            </div>
           </div>
-          <span className="font-label-sm text-label-sm text-on-surface-variant/70">
-            Also available for Windows and Linux
-          </span>
         </section>
 
         {/* Before / after */}

@@ -28,10 +28,15 @@
   --destructive: #f2545c;
   --error-container: rgba(242, 84, 92, 0.12);
 
-  /* Text */
+  /* Text — secondary/tertiary were too dim against the near-black surfaces
+     (e.g. stat-card labels like "Prompts checked" were hard to read); both
+     now match --text-primary so every label is easy to read. Hierarchy
+     between value/label still comes through via size and weight, not
+     color-contrast dimming. Disabled stays dimmed — that's a distinct
+     "unavailable" signal, not the same complaint. */
   --text-primary: #edeef0;
-  --text-secondary: #9ca3ae;
-  --text-tertiary: #6b7280;
+  --text-secondary: #edeef0;
+  --text-tertiary: #edeef0;
   --text-disabled: rgba(237, 238, 240, 0.35);
 
   /* --- Back-compat aliases: pages not yet migrated to the tokens above
