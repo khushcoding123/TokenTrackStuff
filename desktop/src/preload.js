@@ -48,4 +48,6 @@ contextBridge.exposeInMainWorld("metriq", {
   copyToClipboard: (text, stats) => ipcRenderer.invoke("capture:copy", text, stats),
 
   getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
+
+  getUsage: (days) => ipcRenderer.invoke("usage:get", days),
 });

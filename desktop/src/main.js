@@ -8,6 +8,13 @@ const { recordCapture, getSummary } = require("./usage-stats");
 const insforge = require("./insforge-client");
 const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scanner.js");
 const { optimize } = require("../../packages/core/rewrite.js");
+// Same usage engine behind the web /usage dashboard and `metriq trace` — reads
+// this machine's real Claude Code + Codex logs (not the local capture-copy
+// stats in usage-stats.js above, which only track this app's own CTA clicks).
+const { getClaudeDirs, loadClaudeRecords } = require("../../src/core/usage/claude.js");
+const { getCodexSessionsDir, loadCodexUsage } = require("../../src/core/usage/codex.js");
+const { aggregate } = require("../../src/core/usage/aggregate.js");
+const { generateInsights } = require("../../src/core/usage/insights.js");
 
 const WEB_BASE_URL = process.env.METRIQ_WEB_URL || "https://tokenpilot-mocha.vercel.app";
 const CAPTURE_HOTKEY = process.env.METRIQ_CAPTURE_HOTKEY || "CommandOrControl+Shift+M";
@@ -368,14 +375,8 @@ if (!gotSingleInstanceLock) {
   // change needs the email-OTP reset flow (requires SMTP configured
   // server-side, not yet set up for this project). See insforge-client.js.
   ipcMain.handle("account:update-name", async (_event, name) => {
-    const session = loadSession();
-    if (!session?.token) {
-      const err = new Error("Not logged in.");
-      err.code = "NOT_AUTHENTICATED";
-      throw err;
-    }
-    await insforge.updateProfile(session.token, { name });
-    const updated = { ...session, name };
+    await withAuthRetry((token) => insforge.updateProfile(token, { name }));
+    const updated = { ...loadSession(), name };
     saveSession(updated);
     updateTrayMenu();
     return updated;
@@ -383,14 +384,41 @@ if (!gotSingleInstanceLock) {
 
   // --- Project linking --------------------------------------------------
 
-  function requireToken() {
+  // The stored access token is short-lived; InsForge calls 401 with
+  // "Invalid token" once it expires. Refresh via the stored refresh token
+  // and retry exactly once, mirroring @insforge/sdk's own bearer-refresh
+  // path (the web app gets this for free from its cookie-based SDK
+  // middleware — the desktop app has to do it by hand since it holds a
+  // bearer token instead).
+  async function withAuthRetry(fn) {
     const session = loadSession();
     if (!session?.token) {
       const err = new Error("Not logged in.");
       err.code = "NOT_AUTHENTICATED";
       throw err;
     }
-    return session.token;
+    try {
+      return await fn(session.token);
+    } catch (err) {
+      if (err.status !== 401 || !session.refreshToken) throw err;
+      let refreshed;
+      try {
+        refreshed = await insforge.refreshSession(session.refreshToken);
+      } catch {
+        clearSession();
+        updateTrayMenu();
+        const authErr = new Error("Your session expired — please sign in again.");
+        authErr.code = "NOT_AUTHENTICATED";
+        throw authErr;
+      }
+      const updated = {
+        ...session,
+        token: refreshed.accessToken,
+        refreshToken: refreshed.refreshToken || session.refreshToken,
+      };
+      saveSession(updated);
+      return fn(updated.token);
+    }
   }
 
   function scanFolder(folderPath) {
@@ -407,16 +435,17 @@ if (!gotSingleInstanceLock) {
   });
 
   ipcMain.handle("projects:link", async (_event, folderPath) => {
-    const token = requireToken();
     const { files, scannedAt } = scanFolder(folderPath);
     const name = path.basename(folderPath);
 
-    const project = await insforge.createLinkedProject(token, {
-      name,
-      path: folderPath,
-      kind: "local",
-      fileCount: files.length,
-    });
+    const project = await withAuthRetry((token) =>
+      insforge.createLinkedProject(token, {
+        name,
+        path: folderPath,
+        kind: "local",
+        fileCount: files.length,
+      })
+    );
 
     saveFileIndex(project.id, { files, scannedAt });
     savePrefs({ activeProject: { id: project.id, name: project.name, path: project.path } });
@@ -424,23 +453,22 @@ if (!gotSingleInstanceLock) {
   });
 
   ipcMain.handle("projects:list", async () => {
-    const token = requireToken();
-    return insforge.listLinkedProjects(token);
+    return withAuthRetry((token) => insforge.listLinkedProjects(token));
   });
 
   ipcMain.handle("projects:rescan", async (_event, project) => {
-    const token = requireToken();
     const { files, scannedAt } = scanFolder(project.path);
     saveFileIndex(project.id, { files, scannedAt });
-    return insforge.updateLinkedProject(token, project.id, {
-      file_count: files.length,
-      last_scanned_at: scannedAt,
-    });
+    return withAuthRetry((token) =>
+      insforge.updateLinkedProject(token, project.id, {
+        file_count: files.length,
+        last_scanned_at: scannedAt,
+      })
+    );
   });
 
   ipcMain.handle("projects:remove", async (_event, projectId) => {
-    const token = requireToken();
-    await insforge.deleteLinkedProject(token, projectId);
+    await withAuthRetry((token) => insforge.deleteLinkedProject(token, projectId));
     removeFileIndex(projectId);
     const prefs = loadPrefs();
     if (prefs.activeProject?.id === projectId) {
@@ -522,4 +550,44 @@ if (!gotSingleInstanceLock) {
   // --- Usage stats (Overview / Sustainability pages) ---------------------
 
   ipcMain.handle("stats:get-summary", () => getSummary());
+
+  // --- Real token usage (Usage page) --------------------------------------
+  // Mirrors web/app/api/usage/route.js and src/commands/trace.js's
+  // buildPayload exactly, so the numbers agree across web, CLI, and desktop.
+
+  const USAGE_VALID_DAYS = new Set([7, 30, 90]);
+
+  function buildUsagePayload(days) {
+    const sources = [];
+    if (getClaudeDirs().length) sources.push("claude-code");
+    if (getCodexSessionsDir()) sources.push("codex");
+    if (!sources.length) return { available: false, sources: [] };
+
+    const since = new Date(Date.now() - (days + 2) * 24 * 60 * 60 * 1000);
+    const records = [];
+    let rateLimits = null;
+    if (sources.includes("claude-code")) records.push(...loadClaudeRecords({ since }));
+    if (sources.includes("codex")) {
+      const codex = loadCodexUsage({ since });
+      records.push(...codex.records);
+      rateLimits = codex.rateLimits;
+    }
+    if (!records.length) return { available: false, sources };
+
+    const agg = aggregate(records, { days });
+    return {
+      available: true,
+      sources,
+      days,
+      generatedAt: new Date().toISOString(),
+      rateLimits,
+      insights: generateInsights(agg, rateLimits),
+      ...agg,
+    };
+  }
+
+  ipcMain.handle("usage:get", (_event, days) => {
+    const d = USAGE_VALID_DAYS.has(days) ? days : 30;
+    return buildUsagePayload(d);
+  });
 }

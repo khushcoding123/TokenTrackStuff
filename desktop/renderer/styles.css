@@ -846,6 +846,138 @@ h2 {
   color: var(--primary);
 }
 
+/* --- Usage ---------------------------------------------------------------- */
+
+.usage-range {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.usage-range-btn {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--on-surface-variant);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-2);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.usage-range-btn.is-active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-container);
+}
+
+.usage-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 90px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.usage-bar {
+  flex: 1;
+  min-height: 2px;
+  background: var(--primary);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.85;
+}
+
+.usage-insights {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.usage-insight {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--on-surface-variant);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.usage-insight.high {
+  border-left-color: var(--error);
+}
+.usage-insight.medium {
+  border-left-color: var(--tertiary);
+}
+.usage-insight.info {
+  border-left-color: var(--secondary);
+}
+
+.usage-insight h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.usage-insight p {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--on-surface-variant);
+}
+
+.usage-insight .usage-insight-action {
+  color: var(--on-background);
+}
+
+.usage-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.usage-model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usage-model-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+}
+
+.usage-model-label .cost {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-model-bar-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-container);
+  overflow: hidden;
+}
+
+.usage-model-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-full);
+}
+
+.usage-meta {
+  font-size: var(--text-xs);
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
 /* --- Theme-flip wipe animation ------------------------------------------
    Adapted from the web app's light/dark ThemeProvider: the View Transitions
    API captures the whole document as it looked immediately before the

@@ -121,7 +121,10 @@
   }
 
   for (const btn of navButtons) {
-    btn.addEventListener("click", () => showPage(btn.dataset.page));
+    btn.addEventListener("click", () => {
+      showPage(btn.dataset.page);
+      if (btn.dataset.page === "usage") refreshUsage();
+    });
   }
 
   btnGotoProjects?.addEventListener("click", () => showPage("projects"));
@@ -465,6 +468,165 @@
       sustainHistoryList.append(renderActivityRow(entry));
     }
   }
+
+  // --- Usage (real token tracking from local Claude Code / Codex logs) ------
+
+  const usageEmpty = document.getElementById("usage-empty");
+  const usageContent = document.getElementById("usage-content");
+  const usageTiles = document.getElementById("usage-tiles");
+  const usageDailyChart = document.getElementById("usage-daily-chart");
+  const usageInsights = document.getElementById("usage-insights");
+  const usageModels = document.getElementById("usage-models");
+  const usageSessions = document.getElementById("usage-sessions");
+  const usageMeta = document.getElementById("usage-meta");
+  const usageRangeButtons = document.querySelectorAll(".usage-range-btn");
+  const btnRefreshUsage = document.getElementById("btn-refresh-usage");
+
+  let usageDays = 30;
+
+  function fmtTok(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
+    return String(Math.round(n || 0));
+  }
+
+  function usd(n) {
+    return "$" + (n || 0).toFixed(2);
+  }
+
+  function renderUsageTile(label, value, sub) {
+    const card = document.createElement("div");
+    card.className = "stat-card";
+    const v = document.createElement("span");
+    v.className = "stat-value";
+    v.textContent = value;
+    const l = document.createElement("span");
+    l.className = "stat-label";
+    l.textContent = label;
+    card.append(v, l);
+    if (sub) {
+      const s = document.createElement("span");
+      s.className = "activity-time muted";
+      s.textContent = sub;
+      card.append(s);
+    }
+    return card;
+  }
+
+  function renderUsageInsight(insight) {
+    const div = document.createElement("div");
+    div.className = `usage-insight ${insight.severity}`;
+    const h = document.createElement("h3");
+    h.textContent = insight.title;
+    const evidence = document.createElement("p");
+    evidence.textContent = insight.evidence;
+    const action = document.createElement("p");
+    action.className = "usage-insight-action";
+    action.textContent = `→ ${insight.action}`;
+    div.append(h, evidence, action);
+    return div;
+  }
+
+  function renderUsageModelRow(model, maxCost) {
+    const row = document.createElement("div");
+    row.className = "usage-model-row";
+    const label = document.createElement("div");
+    label.className = "usage-model-label";
+    const name = document.createElement("span");
+    name.textContent = model.label;
+    const cost = document.createElement("span");
+    cost.className = "cost";
+    cost.textContent = usd(model.costUSD);
+    label.append(name, cost);
+    const track = document.createElement("div");
+    track.className = "usage-model-bar-track";
+    const fill = document.createElement("div");
+    fill.className = "usage-model-bar-fill";
+    fill.style.width = `${maxCost > 0 ? (model.costUSD / maxCost) * 100 : 0}%`;
+    track.append(fill);
+    row.append(label, track);
+    return row;
+  }
+
+  function renderUsageSessionRow(session) {
+    const li = document.createElement("li");
+    li.className = "activity-item";
+    const left = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "activity-title";
+    title.textContent = session.project;
+    const time = document.createElement("div");
+    time.className = "activity-time muted";
+    time.textContent = `${session.requests} reqs · ${fmtTok(session.totalTokens)} tok`;
+    left.append(title, time);
+    const right = document.createElement("div");
+    right.className = "activity-savings";
+    right.textContent = usd(session.costUSD);
+    li.append(left, right);
+    return li;
+  }
+
+  async function refreshUsage() {
+    const data = await window.metriq.getUsage(usageDays);
+    const available = Boolean(data && data.available);
+    usageEmpty.classList.toggle("hidden", available);
+    usageContent.classList.toggle("hidden", !available);
+    if (!available) return;
+
+    const t = data.totals;
+    const reqs = (data.models || []).reduce((sum, m) => sum + m.requests, 0);
+    usageTiles.innerHTML = "";
+    usageTiles.append(
+      renderUsageTile("Total tokens", fmtTok(t.totalTokens), `${reqs} requests`),
+      renderUsageTile("Total cost", usd(t.costUSD), "API-equivalent"),
+      renderUsageTile("Saved by caching", usd(t.cacheSavingsUSD), `${fmtTok(t.cacheReadTokens)} cached`),
+      renderUsageTile("Output tokens", fmtTok(t.outputTokens), `${fmtTok(t.inputTokens)} input`)
+    );
+
+    const daily = data.daily || [];
+    const dmax = Math.max(...daily.map((d) => d.totalTokens), 1);
+    usageDailyChart.innerHTML = "";
+    for (const d of daily) {
+      const bar = document.createElement("div");
+      bar.className = "usage-bar";
+      bar.style.height = `${Math.max((d.totalTokens / dmax) * 100, 1)}%`;
+      bar.title = `${d.date} · ${fmtTok(d.totalTokens)} tokens`;
+      usageDailyChart.append(bar);
+    }
+
+    const insights = data.insights || [];
+    usageInsights.innerHTML = "";
+    if (!insights.length) {
+      const p = document.createElement("p");
+      p.className = "muted empty-note";
+      p.textContent = "No issues flagged — usage looks healthy.";
+      usageInsights.append(p);
+    } else {
+      for (const insight of insights) usageInsights.append(renderUsageInsight(insight));
+    }
+
+    const models = data.models || [];
+    const maxCost = Math.max(...models.map((m) => m.costUSD), 0);
+    usageModels.innerHTML = "";
+    for (const model of models) usageModels.append(renderUsageModelRow(model, maxCost));
+
+    usageSessions.innerHTML = "";
+    for (const session of (data.sessions || []).slice(0, 10)) {
+      usageSessions.append(renderUsageSessionRow(session));
+    }
+
+    usageMeta.textContent = `sources: ${(data.sources || []).join(", ")} · last ${data.days}d · updated ${new Date().toLocaleTimeString()}`;
+  }
+
+  for (const btn of usageRangeButtons) {
+    btn.addEventListener("click", () => {
+      usageDays = parseInt(btn.dataset.days, 10);
+      for (const b of usageRangeButtons) b.classList.toggle("is-active", b === btn);
+      refreshUsage();
+    });
+  }
+
+  btnRefreshUsage?.addEventListener("click", () => refreshUsage());
 
   window.metriq.onAuthSuccess((session) => {
     if (session) showLoggedIn(session);
