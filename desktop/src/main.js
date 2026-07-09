@@ -522,6 +522,34 @@ if (!gotSingleInstanceLock) {
     return true;
   });
 
+  // --- Accessibility preferences -------------------------------------------
+  // { highContrast, reduceMotion, dyslexiaFont, colorblind } — each a plain
+  // boolean, or absent if the user has never touched that toggle (renderer.js
+  // treats "absent" as "no explicit preference" rather than "off", so it can
+  // fall back to the OS prefers-reduced-motion signal only for that one).
+
+  ipcMain.handle("prefs:get-accessibility", () => loadPrefs().accessibility ?? {});
+
+  ipcMain.handle("prefs:set-accessibility", (_event, patch) => {
+    const merged = { ...(loadPrefs().accessibility ?? {}), ...patch };
+    savePrefs({ accessibility: merged });
+    return merged;
+  });
+
+  // Synchronous, read at preload time (see preload.js) so the renderer can
+  // apply the saved theme/accessibility classes to <html> in a blocking
+  // <head> script before the page paints — avoids a flash of the default
+  // (wrong) theme/contrast/motion on every launch. ipcMain.handle/invoke is
+  // inherently async and can't be used for this; sendSync blocks the
+  // renderer until this returns, which is fine for a tiny local JSON read.
+  ipcMain.on("prefs:get-initial-sync", (event) => {
+    const prefs = loadPrefs();
+    event.returnValue = {
+      theme: prefs.theme ?? "dark",
+      accessibility: prefs.accessibility ?? {},
+    };
+  });
+
   // --- Prompt capture window ----------------------------------------------
 
   ipcMain.handle("capture:open", () => {

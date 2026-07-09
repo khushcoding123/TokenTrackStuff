@@ -84,18 +84,18 @@
   text-transform: uppercase;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(75, 226, 119, 0.15);
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
   color: var(--primary);
 }
 
 .capture-badge.rating-broad {
-  background: rgba(255, 180, 171, 0.15);
+  background: color-mix(in srgb, var(--error) 15%, transparent);
   color: var(--error);
 }
 
 .capture-badge.rating-moderate {
-  background: rgba(255, 186, 97, 0.15);
-  color: #ffba61;
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+  color: var(--warning);
 }
 
 .capture-issues {

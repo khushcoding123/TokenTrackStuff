@@ -14,6 +14,7 @@
   const captureHotkeyLabel = document.getElementById("capture-hotkey-label");
   const settingsHotkeyLabel = document.getElementById("settings-hotkey-label");
   const toolsList = document.getElementById("tools-list");
+  const accessibilityList = document.getElementById("accessibility-list");
   const overviewActiveProject = document.getElementById("overview-active-project");
   const recentActivityList = document.getElementById("recent-activity-list");
   const recentActivityEmpty = document.getElementById("recent-activity-empty");
@@ -192,6 +193,7 @@
     showPage("overview");
     refreshProjects();
     initTools();
+    initAccessibility();
     refreshStats();
   }
 
@@ -285,6 +287,97 @@
 
       row.append(iconWrap, textWrap, checkbox, toggle);
       toolsList.append(row);
+    }
+  }
+
+  // --- Accessibility ------------------------------------------------------
+  // Same reusable toggle-row primitive as Tools (.tool-row / .tool-row-icon /
+  // .tool-row-input / .tool-row-toggle), extended with a title+description
+  // pair instead of a single label — see desktop/DESIGN.md for the toggle
+  // spec these rows follow. Each option maps 1:1 to a class applied to
+  // <html> (see styles.css and theme-init.js, which applies the saved
+  // values before first paint to avoid a flash on launch).
+
+  const ACCESSIBILITY_OPTIONS = [
+    {
+      id: "highContrast",
+      className: "high-contrast",
+      icon: "contrast",
+      label: "High contrast",
+      description: "A dedicated high-contrast palette — stronger separation between text, surfaces, borders, and controls.",
+    },
+    {
+      id: "reduceMotion",
+      className: "reduce-motion",
+      icon: "motion",
+      label: "Reduce motion",
+      description: "Turns off animations, transitions, and hover effects everywhere. Defaults to your system setting until you choose explicitly.",
+    },
+    {
+      id: "dyslexiaFont",
+      className: "dyslexia-font",
+      icon: "font",
+      label: "Dyslexia-friendly font",
+      description: "Switches interface text to OpenDyslexic. Code, token counts, and other monospace values are unaffected.",
+    },
+    {
+      id: "colorblind",
+      className: "colorblind",
+      icon: "eye",
+      label: "Colorblind-friendly mode",
+      description: "Shifts status colors to a palette distinguishable across common color vision deficiencies.",
+    },
+  ];
+
+  const A11Y_ICON_PATHS = {
+    contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" stroke="none"/>',
+    motion: '<path d="M4 6h11M4 12h16M4 18h8"/><path d="m17 15 3-3-3-3"/>',
+    font: '<path d="M5 19 10.5 5h2L18 19M8 14h7"/>',
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  };
+
+  async function initAccessibility() {
+    const saved = (await window.metriq.getAccessibility()) || {};
+    const prefersReducedMotionOS =
+      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    accessibilityList.innerHTML = "";
+    for (const opt of ACCESSIBILITY_OPTIONS) {
+      const explicit = saved[opt.id];
+      const isOn = explicit === true || (opt.id === "reduceMotion" && explicit === undefined && prefersReducedMotionOS);
+
+      const row = document.createElement("label");
+      row.className = "tool-row a11y-row" + (isOn ? " is-checked" : "");
+
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "tool-row-icon";
+      iconWrap.innerHTML = svgIcon(A11Y_ICON_PATHS[opt.icon] || "");
+
+      const textWrap = document.createElement("span");
+      textWrap.className = "tool-row-text";
+      const title = document.createElement("span");
+      title.className = "tool-row-title";
+      title.textContent = opt.label;
+      const desc = document.createElement("span");
+      desc.className = "tool-row-desc";
+      desc.textContent = opt.description;
+      textWrap.append(title, desc);
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "tool-row-input";
+      checkbox.checked = isOn;
+      checkbox.addEventListener("change", async () => {
+        row.classList.toggle("is-checked", checkbox.checked);
+        document.documentElement.classList.toggle(opt.className, checkbox.checked);
+        await window.metriq.setAccessibility({ [opt.id]: checkbox.checked });
+      });
+
+      const toggle = document.createElement("span");
+      toggle.className = "tool-row-toggle";
+
+      row.append(iconWrap, textWrap, checkbox, toggle);
+      accessibilityList.append(row);
     }
   }
 

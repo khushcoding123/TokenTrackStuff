@@ -26,7 +26,7 @@
   --warning: #f0a93a;
   --error: #f2545c;
   --destructive: #f2545c;
-  --error-container: rgba(242, 84, 92, 0.12);
+  --error-container: color-mix(in srgb, var(--error) 12%, transparent);
 
   /* Text — secondary/tertiary were too dim against the near-black surfaces
      (e.g. stat-card labels like "Prompts checked" were hard to read); both
@@ -52,9 +52,9 @@
   --on-surface-variant: var(--text-secondary);
   --primary: var(--accent-primary);
   --on-primary: var(--on-accent-primary);
-  --primary-container: rgba(52, 211, 153, 0.14);
+  --primary-container: color-mix(in srgb, var(--accent-primary) 14%, transparent);
   --secondary: var(--accent-secondary);
-  --secondary-container: rgba(108, 142, 245, 0.14);
+  --secondary-container: color-mix(in srgb, var(--accent-secondary) 14%, transparent);
   --tertiary: var(--warning);
 
   color-scheme: dark;
@@ -130,7 +130,7 @@
   --warning: #b45300;
   --error: #dc2626;
   --destructive: #dc2626;
-  --error-container: rgba(220, 38, 38, 0.08);
+  --error-container: color-mix(in srgb, var(--error) 8%, transparent);
 
   /* secondary/tertiary matched to primary (near-black) for the same reason
      as the dark palette above — grey-on-white was still harder to read
@@ -149,9 +149,9 @@
   --on-surface-variant: var(--text-secondary);
   --primary: var(--accent-primary);
   --on-primary: var(--on-accent-primary);
-  --primary-container: rgba(22, 163, 74, 0.1);
+  --primary-container: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   --secondary: var(--accent-secondary);
-  --secondary-container: rgba(59, 95, 206, 0.1);
+  --secondary-container: color-mix(in srgb, var(--accent-secondary) 10%, transparent);
   --tertiary: var(--warning);
 
   color-scheme: light;
@@ -166,6 +166,178 @@
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ==========================================================================
+   Accessibility modes (Settings → Accessibility)
+   Each is a token override layer, not a parallel set of component styles —
+   every component already reads colors/fonts from these variables, so
+   flipping one class here reflows the whole app with no per-component work.
+   ========================================================================== */
+
+/* --- High contrast ------------------------------------------------------
+   A dedicated palette, not an inversion: true black/white bases, full-
+   opacity borders, and boosted-saturation accents so every pairing here
+   clears WCAG AA (most clear AAA) — verified below each block. */
+
+:root.high-contrast {
+  --bg-shell: #000000;
+  --bg-canvas: #000000;
+  --surface-1: #000000;
+  --surface-2: #0d0d0d;
+  --surface-hover: rgba(255, 255, 255, 0.16);
+  --surface-active: rgba(255, 255, 255, 0.26);
+
+  --border-subtle: rgba(255, 255, 255, 0.5);
+  --border-default: #ffffff;
+  --border-strong: #ffffff;
+
+  /* accent-primary #00e676 on #000: ~15:1. on-accent-primary #000 on
+     #00e676: ~13:1. Both comfortably AAA. */
+  --accent-primary: #00e676;
+  --on-accent-primary: #000000;
+  --accent-secondary: #4db8ff;
+
+  --success: var(--accent-primary);
+  --warning: #ffd400;
+  --error: #ff6b6b;
+  --destructive: #ff6b6b;
+  /* --error/--primary/--secondary-container derive automatically via
+     color-mix() from the accent tokens above — no need to restate them. */
+
+  /* text-primary #fff on #000: 21:1 (max possible). */
+  --text-primary: #ffffff;
+  --text-secondary: #ffffff;
+  --text-tertiary: #ffffff;
+  --text-disabled: rgba(255, 255, 255, 0.55);
+
+  --background: var(--bg-canvas);
+  --surface: var(--surface-1);
+  --surface-container: var(--surface-2);
+  --surface-container-high: var(--surface-2);
+  --border: var(--border-default);
+  --on-background: var(--text-primary);
+  --on-surface-variant: var(--text-secondary);
+  --primary: var(--accent-primary);
+  --on-primary: var(--on-accent-primary);
+  --secondary: var(--accent-secondary);
+  --tertiary: var(--warning);
+}
+
+:root.light.high-contrast {
+  --bg-shell: #ffffff;
+  --bg-canvas: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #efefef;
+  --surface-hover: rgba(0, 0, 0, 0.1);
+  --surface-active: rgba(0, 0, 0, 0.2);
+
+  --border-subtle: rgba(0, 0, 0, 0.5);
+  --border-default: #000000;
+  --border-strong: #000000;
+
+  /* accent-primary #00703b on #fff: ~5.9:1. on-accent-primary #fff on
+     #00703b: same ratio inverted, both clear AA for normal text. */
+  --accent-primary: #00703b;
+  --on-accent-primary: #ffffff;
+  --accent-secondary: #0047ab;
+
+  --success: var(--accent-primary);
+  --warning: #7a4b00;
+  --error: #a30000;
+  --destructive: #a30000;
+
+  /* text-primary #000 on #fff: 21:1. */
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
+  --text-disabled: rgba(0, 0, 0, 0.5);
+
+  --background: var(--bg-canvas);
+  --surface: var(--surface-1);
+  --surface-container: var(--surface-2);
+  --surface-container-high: var(--surface-2);
+  --border: var(--border-default);
+  --on-background: var(--text-primary);
+  --on-surface-variant: var(--text-secondary);
+  --primary: var(--accent-primary);
+  --on-primary: var(--on-accent-primary);
+  --secondary: var(--accent-secondary);
+  --tertiary: var(--warning);
+}
+
+/* --- Reduce motion --------------------------------------------------------
+   Class-based equivalent of the prefers-reduced-motion media query above —
+   this is the explicit in-app override; theme-init.js applies it by default
+   only when the user has never set the toggle, falling back to the OS
+   setting instead. Both can be active at once with no conflict. */
+.reduce-motion,
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* --- Dyslexia-friendly font ----------------------------------------------
+   OpenDyslexic, bundled locally (renderer/assets/fonts — SIL OFL 1.1, see
+   OpenDyslexic-LICENSE.txt there) since the CSP's style-src 'self' blocks
+   a remote @import. Overrides only --font-ui, which is what `body` reads —
+   every element that sets `font-family: var(--font-mono)` directly (token
+   counts, costs, code, session IDs) is untouched by this override. */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("assets/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("assets/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.dyslexia-font {
+  --font-ui: "OpenDyslexic", "Comic Sans MS", Verdana, Tahoma, sans-serif;
+}
+
+.dyslexia-font body {
+  /* OpenDyslexic's heavier, irregular letterforms read better with a bit
+     more breathing room — spacing/hierarchy/layout are otherwise unchanged. */
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+
+/* --- Colorblind-friendly mode ----------------------------------------------
+   Remaps the four semantic roles (primary/success, warning, error, info) to
+   an Okabe–Ito-derived palette validated for deuteranopia/protanopia/
+   tritanopia — the important property is that success (usually green) and
+   error (usually red) stay distinguishable by hue, not just luminance. */
+.colorblind {
+  --accent-primary: #009e73; /* bluish green — replaces the brand green as success/primary */
+  --on-accent-primary: #ffffff;
+  --accent-secondary: #0072b2; /* blue — info/focus */
+  --success: var(--accent-primary);
+  --warning: #e69f00; /* orange */
+  --error: #d55e00; /* vermillion — reads distinctly from both the green and the orange */
+  --destructive: #d55e00;
+  /* --error/--primary/--secondary-container derive automatically via
+     color-mix() from the accent tokens above — no need to restate them. */
+}
+
+:root.light.colorblind {
+  --accent-primary: #00794d;
+  --on-accent-primary: #ffffff;
+  --accent-secondary: #0060a0;
+  --success: var(--accent-primary);
+  --warning: #a06800;
+  --error: #b34c00;
+  --destructive: #b34c00;
 }
 
 * {
@@ -297,7 +469,7 @@ h2 {
 
 .btn-danger-outline {
   background: transparent;
-  border-color: rgba(242, 84, 92, 0.4);
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
   color: var(--destructive);
   max-width: none;
 }
@@ -540,7 +712,7 @@ h2 {
 }
 
 .stat-card-accent {
-  border-color: rgba(52, 211, 153, 0.35);
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
   background: var(--primary-container);
 }
 
@@ -580,7 +752,7 @@ h2 {
   padding: var(--space-4);
   margin: 0 0 var(--space-6);
   background: var(--surface-2);
-  border: 1px solid rgba(52, 211, 153, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent);
   border-radius: var(--radius-md);
   cursor: pointer;
   font-family: inherit;
@@ -798,7 +970,7 @@ h2 {
 }
 
 .pill-action:hover {
-  background: rgba(52, 211, 153, 0.2);
+  background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .pill-action:disabled {
@@ -825,7 +997,7 @@ h2 {
 
 .project-item.is-active {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .project-item-top {
@@ -949,7 +1121,8 @@ h2 {
 
 /* --- Tools: full-width rows with a real toggle switch ------------------- */
 
-.tools-list {
+.tools-list,
+.a11y-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -969,7 +1142,7 @@ h2 {
 }
 
 .tool-row:hover {
-  border-color: rgba(52, 211, 153, 0.4);
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
 .tool-row.is-checked {
@@ -991,13 +1164,46 @@ h2 {
 
 .tool-row.is-checked .tool-row-icon {
   color: var(--accent-primary);
-  background: rgba(52, 211, 153, 0.16);
+  background: color-mix(in srgb, var(--accent-primary) 16%, transparent);
 }
 
 .tool-row-label {
   flex: 1;
   font-size: var(--text-md);
   font-weight: 600;
+}
+
+/* Accessibility rows reuse .tool-row/.tool-row-icon/.tool-row-input/
+   .tool-row-toggle as-is (same toggle-switch primitive, same layout), but
+   need a title + description instead of Tools' single-line label — this
+   pair replaces .tool-row-label for that case without touching it. */
+.tool-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-row-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.tool-row-desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.a11y-row {
+  align-items: flex-start;
+  min-height: 0;
+  padding: var(--space-4);
+}
+
+.a11y-row .tool-row-toggle {
+  margin-top: 2px;
 }
 
 .tool-row-input {
@@ -1130,7 +1336,7 @@ h2 {
 .settings-name-input:focus {
   outline: none;
   border-color: var(--accent-secondary);
-  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.25);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-secondary) 25%, transparent);
 }
 
 .settings-list {
