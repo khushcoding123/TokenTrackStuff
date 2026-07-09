@@ -66,5 +66,5 @@ export async function GET(request) {
     return NextResponse.redirect(new URL(`/desktop-connected?${params.toString()}`, request.url));
   }
 
-  return NextResponse.redirect(new URL("/usage", request.url));
+  return NextResponse.redirect(new URL("/", request.url));
 }

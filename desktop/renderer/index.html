@@ -41,6 +41,11 @@
                 <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
               </svg>
             </button>
+            <button class="nav-btn" data-page="prompt-studio" title="Prompt Studio" aria-label="Prompt Studio">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+              </svg>
+            </button>
             <button class="nav-btn" data-page="projects" title="Projects" aria-label="Projects">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
@@ -146,6 +151,65 @@
                 </div>
                 <p class="muted">Nothing yet — check a prompt to see it here.</p>
               </div>
+            </div>
+          </section>
+
+          <!-- Prompt Studio -->
+          <section id="page-prompt-studio" class="page hidden">
+            <h1 class="page-title">Prompt Studio</h1>
+            <p class="muted page-subtitle">
+              Draft a prompt and see exactly how it'll be analyzed before you send it to Claude, ChatGPT, Cursor, or
+              VS Code.
+            </p>
+
+            <div id="ps-context" class="ps-context muted"></div>
+
+            <textarea
+              id="ps-input"
+              class="ps-input"
+              rows="6"
+              placeholder="Paste or write the prompt you're about to send..."
+            ></textarea>
+
+            <p id="ps-empty-hint" class="muted ps-empty-hint">Start typing to see live analysis.</p>
+
+            <div id="ps-results" class="hidden">
+              <div class="ps-score-row">
+                <span id="ps-rating" class="capture-badge"></span>
+                <span id="ps-score" class="ps-score"></span>
+                <span id="ps-savings" class="ps-savings"></span>
+              </div>
+
+              <div id="ps-issues-block" class="section-block hidden">
+                <div class="section-header">
+                  <h2>What's flagged</h2>
+                </div>
+                <ul id="ps-issues" class="ps-issues"></ul>
+              </div>
+
+              <div id="ps-files-block" class="section-block hidden">
+                <div class="section-header">
+                  <h2>Relevant files found</h2>
+                </div>
+                <div id="ps-files" class="ps-files"></div>
+              </div>
+
+              <div class="section-block">
+                <div class="section-header">
+                  <h2>Focused rewrite</h2>
+                  <button id="ps-btn-copy" class="link-btn">Copy</button>
+                </div>
+                <p id="ps-focused" class="ps-focused"></p>
+                <button id="ps-btn-snapshot" class="pill-action ps-snapshot-btn">Save this revision</button>
+              </div>
+            </div>
+
+            <div class="section-block">
+              <div class="section-header">
+                <h2>Revision history</h2>
+              </div>
+              <ul id="ps-history-list" class="activity-list"></ul>
+              <p id="ps-history-empty" class="muted empty-note">Saved revisions from this session will show up here.</p>
             </div>
           </section>
 

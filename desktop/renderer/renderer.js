@@ -141,6 +141,167 @@
 
   window.metriq.getTheme().then((theme) => applyTheme(theme));
 
+  // --- Prompt Studio ----------------------------------------------------
+  // Reuses the exact same IPC surface as the ⌘⇧M capture window
+  // (getCaptureContext/analyzePrompt/copyToClipboard — see main.js's
+  // capture:* handlers) against the real active project, just as a full
+  // page with the complete issue list, relevant-files list, and a
+  // session-only revision history instead of the capture window's compact
+  // single-result view. Ported from the web app's /prompt-studio, which
+  // had a fake "model response" panel — this version has none, since
+  // every number here already comes from the real engine.
+
+  const psContext = document.getElementById("ps-context");
+  const psInput = document.getElementById("ps-input");
+  const psEmptyHint = document.getElementById("ps-empty-hint");
+  const psResults = document.getElementById("ps-results");
+  const psRating = document.getElementById("ps-rating");
+  const psScore = document.getElementById("ps-score");
+  const psSavings = document.getElementById("ps-savings");
+  const psIssuesBlock = document.getElementById("ps-issues-block");
+  const psIssues = document.getElementById("ps-issues");
+  const psFilesBlock = document.getElementById("ps-files-block");
+  const psFiles = document.getElementById("ps-files");
+  const psFocused = document.getElementById("ps-focused");
+  const psBtnCopy = document.getElementById("ps-btn-copy");
+  const psBtnSnapshot = document.getElementById("ps-btn-snapshot");
+  const psHistoryList = document.getElementById("ps-history-list");
+  const psHistoryEmpty = document.getElementById("ps-history-empty");
+
+  let psInitialized = false;
+  let psDebounceTimer = null;
+  let psLatestResult = null;
+  const psHistory = []; // session-only: { timestamp, prompt, result }
+
+  function psRenderResult(result) {
+    psResults.classList.remove("hidden");
+    psEmptyHint.classList.add("hidden");
+
+    psRating.textContent = result.rating;
+    psRating.className = `capture-badge rating-${result.rating}`;
+    psScore.textContent = `breadth ${result.breadthScore}/100`;
+    psSavings.textContent =
+      result.savedTokens > 0 ? `saves ~${result.savedTokens} tokens (${result.savedPct}%)` : "";
+
+    const issues = result.issues || [];
+    psIssuesBlock.classList.toggle("hidden", issues.length === 0);
+    psIssues.innerHTML = "";
+    for (const issue of issues) {
+      const li = document.createElement("li");
+      li.textContent = issue.message;
+      psIssues.append(li);
+    }
+
+    const files = result.relevantFiles || [];
+    psFilesBlock.classList.toggle("hidden", files.length === 0);
+    psFiles.innerHTML = "";
+    for (const file of files) {
+      const span = document.createElement("span");
+      span.textContent = file;
+      psFiles.append(span);
+    }
+
+    psFocused.textContent = result.focusedPrompt;
+    psLatestResult = result;
+  }
+
+  function psClearResult() {
+    psResults.classList.add("hidden");
+    psEmptyHint.classList.remove("hidden");
+    psLatestResult = null;
+  }
+
+  function psRenderHistoryRow(entry) {
+    const li = document.createElement("li");
+    li.className = "activity-item";
+    li.style.cursor = "pointer";
+
+    const left = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "activity-title";
+    title.textContent = entry.prompt.length > 60 ? entry.prompt.slice(0, 60) + "…" : entry.prompt;
+    const time = document.createElement("div");
+    time.className = "activity-time muted";
+    time.textContent = `${entry.result.rating} · ${timeAgo(entry.timestamp)}`;
+    left.append(title, time);
+
+    const right = document.createElement("div");
+    right.className = "activity-savings";
+    right.textContent = entry.result.savedTokens > 0 ? `−${entry.result.savedTokens} tokens` : "—";
+
+    li.append(left, right);
+    li.addEventListener("click", () => {
+      psInput.value = entry.prompt;
+      psRenderResult(entry.result);
+    });
+    return li;
+  }
+
+  function psRefreshHistory() {
+    psHistoryList.innerHTML = "";
+    psHistoryEmpty.classList.toggle("hidden", psHistory.length > 0);
+    for (const entry of [...psHistory].reverse()) {
+      psHistoryList.append(psRenderHistoryRow(entry));
+    }
+  }
+
+  async function initPromptStudio() {
+    if (psInitialized) return;
+    psInitialized = true;
+
+    const { activeProject } = await window.metriq.getCaptureContext();
+    psContext.textContent = activeProject
+      ? `Checking against ${activeProject.name}`
+      : "No project linked — link one from Projects for file-aware analysis.";
+
+    psInput.addEventListener("input", () => {
+      clearTimeout(psDebounceTimer);
+      const prompt = psInput.value.trim();
+      if (!prompt) {
+        psClearResult();
+        return;
+      }
+      psDebounceTimer = setTimeout(async () => {
+        const result = await window.metriq.analyzePrompt(prompt);
+        psRenderResult(result);
+      }, 350);
+    });
+
+    psBtnCopy.addEventListener("click", async () => {
+      if (!psLatestResult) return;
+      await window.metriq.copyToClipboard(psLatestResult.focusedPrompt, {
+        promptTokens: psLatestResult.promptTokens,
+        projectedTokens: psLatestResult.projectedTokens,
+        savedTokens: psLatestResult.savedTokens,
+        savedPct: psLatestResult.savedPct,
+        rating: psLatestResult.rating,
+      });
+      refreshStats(); // same real capture stats Overview/Impact read — keep them in sync
+      const original = psBtnCopy.textContent;
+      psBtnCopy.textContent = "Copied!";
+      setTimeout(() => {
+        psBtnCopy.textContent = original;
+      }, 1200);
+    });
+
+    psBtnSnapshot.addEventListener("click", () => {
+      if (!psLatestResult) return;
+      psHistory.push({
+        timestamp: new Date().toISOString(),
+        prompt: psInput.value.trim(),
+        result: psLatestResult,
+      });
+      psRefreshHistory();
+      const original = psBtnSnapshot.textContent;
+      psBtnSnapshot.textContent = "Saved!";
+      setTimeout(() => {
+        psBtnSnapshot.textContent = original;
+      }, 1200);
+    });
+
+    psRefreshHistory();
+  }
+
   // --- Page navigation ------------------------------------------------------
 
   const navButtons = document.querySelectorAll(".nav-btn");
@@ -160,6 +321,7 @@
     btn.addEventListener("click", () => {
       showPage(btn.dataset.page);
       if (btn.dataset.page === "usage") refreshUsage();
+      if (btn.dataset.page === "prompt-studio") initPromptStudio();
     });
   }
 

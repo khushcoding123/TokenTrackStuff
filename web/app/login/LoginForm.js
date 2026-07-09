@@ -70,7 +70,7 @@ export default function LoginForm() {
         return;
       }
 
-      const next = searchParams.get("next") || "/usage";
+      const next = searchParams.get("next") || "/";
       router.push(next);
       router.refresh();
     } catch {

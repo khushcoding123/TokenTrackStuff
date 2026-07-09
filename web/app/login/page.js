@@ -7,7 +7,7 @@ export const metadata = { title: "Log in" };
 
 export default async function LoginPage({ searchParams }) {
   const session = await getSession();
-  if (session) redirect("/usage");
+  if (session) redirect("/");
 
   const params = await searchParams;
   const isDesktop = params?.desktop === "1";
