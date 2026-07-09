@@ -1,21 +1,56 @@
 :root {
-  /* Base tokens — kept aligned with the companion web app's palette
-     (web/app/globals.css) so the desktop app visually rhymes with it. */
-  --background: #0b0f14;
-  --surface: #131a22;
-  --surface-container: #1c2b3c;
-  --surface-container-high: #24374d;
-  --border: #1f2937;
-  --on-background: #d4e4fa;
-  --on-surface-variant: #bccbb9;
-  --primary: #4be277;
-  --on-primary: #003915;
-  --primary-container: rgba(75, 226, 119, 0.14);
-  --secondary: #adc6ff;
-  --secondary-container: rgba(173, 198, 255, 0.14);
-  --tertiary: #ffba61;
-  --error: #ffb4ab;
-  --error-container: rgba(255, 180, 171, 0.12);
+  /* --- Design tokens — see desktop/DESIGN.md for the full rationale.
+     Dark is the primary, fully-specified palette. --- */
+
+  /* Surfaces (elevation ladder: shell < canvas < surface-1 < surface-2) */
+  --bg-shell: #0a0b0d;
+  --bg-canvas: #0c0e11;
+  --surface-1: #121417;
+  --surface-2: #191c20;
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --surface-active: rgba(255, 255, 255, 0.09);
+
+  /* Borders (opacity-based so they work at any elevation level) */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  /* Accents — green stays the single brand hue (continuity with the CLI
+     and web dashboards); indigo is reserved strictly for focus/info states */
+  --accent-primary: #34d399;
+  --on-accent-primary: #06120c;
+  --accent-secondary: #6c8ef5;
+
+  /* Semantic */
+  --success: var(--accent-primary);
+  --warning: #f0a93a;
+  --error: #f2545c;
+  --destructive: #f2545c;
+  --error-container: rgba(242, 84, 92, 0.12);
+
+  /* Text */
+  --text-primary: #edeef0;
+  --text-secondary: #9ca3ae;
+  --text-tertiary: #6b7280;
+  --text-disabled: rgba(237, 238, 240, 0.35);
+
+  /* --- Back-compat aliases: pages not yet migrated to the tokens above
+     (Projects/Tools/Impact/Settings — each redesigned in its own phase)
+     still reference these names, so they inherit the new palette without
+     needing their own CSS touched before their turn. --- */
+  --background: var(--bg-canvas);
+  --surface: var(--surface-1);
+  --surface-container: var(--surface-2);
+  --surface-container-high: var(--surface-2);
+  --border: var(--border-default);
+  --on-background: var(--text-primary);
+  --on-surface-variant: var(--text-secondary);
+  --primary: var(--accent-primary);
+  --on-primary: var(--on-accent-primary);
+  --primary-container: rgba(52, 211, 153, 0.14);
+  --secondary: var(--accent-secondary);
+  --secondary-container: rgba(108, 142, 245, 0.14);
+  --tertiary: var(--warning);
 
   color-scheme: dark;
 
@@ -27,11 +62,14 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-10: 40px;
 
-  /* Radius scale */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  /* Radius scale — tightened from the previous 8/12/16 to read as
+     engineered rather than pillowy (Linear/Vercel sit in this range) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
   --radius-full: 999px;
 
   /* Type scale */
@@ -41,29 +79,43 @@
   --text-md: 14px;
   --text-lg: 16px;
   --text-xl: 20px;
-  --text-2xl: 26px;
+  --text-2xl: 22px;
+  --text-metric: 24px;
+
+  /* Fonts — Inter for UI text, JetBrains Mono for every number (tabular
+     figures so metrics don't shift width as they update). No network font
+     loading: the CSP (style-src 'self') blocks remote @import, so both
+     stacks fall back gracefully to whatever's installed locally. */
+  --font-ui: "Inter", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Layout */
+  --sidebar-width: 64px;
 }
 
-/* Light theme — toggled via .light on <html>, applied by renderer.js.
-   Values mirror the web app's :root.light palette (web/app/globals.css). */
-:root.light {
-  --background: #f5f7fa;
-  --surface: #ffffff;
-  --surface-container: #eaeef3;
-  --surface-container-high: #e0e5ec;
-  --border: #e1e5eb;
-  --on-background: #0f1720;
-  --on-surface-variant: #48505c;
-  --primary: #16a34a;
-  --on-primary: #ffffff;
-  --primary-container: rgba(22, 163, 74, 0.1);
-  --secondary: #3b5fce;
-  --secondary-container: rgba(59, 95, 206, 0.1);
-  --tertiary: #b45300;
-  --error: #dc2626;
-  --error-container: rgba(220, 38, 38, 0.08);
+/* Phase 5 decision point: light mode has been retired (see the removed
+   :root.light block, formerly here, in git history) — this app is
+   dark-mode-only going forward, per desktop/DESIGN.md. It stayed
+   functional through Phases 1–4 by design; the Settings page (Phase 5)
+   is where that trade-off was made explicit and the toggle removed,
+   rather than it quietly disappearing along the way. */
 
-  color-scheme: light;
+/* Blanket reduced-motion guard — every transition/animation added by this
+   redesign is covered here rather than needing its own media query. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 * {
@@ -78,7 +130,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--on-background);
-  font-family: -apple-system, "Inter", "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -194,11 +246,14 @@ h2 {
 }
 
 .btn-danger-outline {
-  background: var(--error-container);
-  border-color: var(--error);
-  color: var(--error);
+  background: transparent;
+  border-color: rgba(242, 84, 92, 0.4);
+  color: var(--destructive);
   max-width: none;
-  margin-top: var(--space-8);
+}
+
+.btn-danger-outline:hover {
+  background: var(--error-container);
 }
 
 .waiting {
@@ -233,12 +288,6 @@ h2 {
   flex-shrink: 0;
 }
 
-.avatar-sm {
-  width: 30px;
-  height: 30px;
-  font-size: var(--text-sm);
-}
-
 .identity-name {
   font-weight: 600;
   font-size: var(--text-md);
@@ -248,43 +297,84 @@ h2 {
   font-size: var(--text-sm);
 }
 
-/* --- App shell: topbar + page content + bottom nav --------------------- */
+/* --- App shell: sidebar (icon rail) + main column ----------------------
+   Replaces the old bottom tab bar — see desktop/DESIGN.md §7. A bottom bar
+   is a mobile/thumb-reach convention; desktop apps put primary nav on the
+   left edge (Linear, Arc, VS Code) because it scales with more destinations
+   without competing with content for vertical space. The window stays a
+   fixed 480px wide, so this is an icon-only rail (64px) with native
+   title-attribute tooltips rather than a labeled sidebar — a labeled
+   sidebar at this width would claim too much of the window for nav alone. */
 
 .app-shell {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 0;
 }
 
-.topbar {
+.sidebar {
+  width: var(--sidebar-width);
   flex-shrink: 0;
-  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-shell);
+  border-right: 1px solid var(--border-subtle);
+  padding: var(--space-3) 0;
+}
+
+.sidebar-brand {
+  margin-bottom: var(--space-4);
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sidebar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--primary-container);
+  border: 1px solid var(--border-default);
+  color: var(--accent-primary);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.topbar .brand {
-  position: static;
-}
-
-.topbar-identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.topbar-name {
+  justify-content: center;
+  font-weight: 700;
   font-size: var(--text-sm);
-  font-weight: 600;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: border-color var(--duration-fast) ease;
+}
+
+.sidebar-avatar:hover {
+  border-color: var(--accent-primary);
+}
+
+.main-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
 .page-content {
@@ -314,43 +404,45 @@ h2 {
   margin-bottom: 0;
 }
 
-.bottom-nav {
-  flex-shrink: 0;
-  display: flex;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-  padding: var(--space-1) var(--space-1) max(var(--space-1), env(safe-area-inset-bottom));
-}
-
 .nav-btn {
-  flex: 1;
+  position: relative;
+  width: 44px;
+  height: 44px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: var(--space-2) 2px;
   background: none;
   border: none;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: var(--radius-sm);
   font-family: inherit;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.nav-btn span {
-  font-size: 10px;
-  font-weight: 600;
+  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
 }
 
 .nav-btn:hover {
-  color: var(--on-background);
-  background: var(--surface-container);
+  color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
 .nav-btn.is-active {
-  color: var(--primary);
+  color: var(--accent-primary);
+  background: var(--surface-1);
+}
+
+/* Active-item rail indicator — the strongest "you are here" signal,
+   independent of the icon color change above (nav-state-active guidance:
+   current location should be more than just a color swap). */
+.nav-btn.is-active::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
 }
 
 /* --- Overview: stat cards, active-project card, activity feed ---------- */
@@ -367,51 +459,118 @@ h2 {
 }
 
 .stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  transition: border-color var(--duration-fast) ease;
 }
 
 .stat-card-accent {
-  border-color: rgba(75, 226, 119, 0.35);
+  border-color: rgba(52, 211, 153, 0.35);
   background: var(--primary-container);
 }
 
 .stat-value {
-  font-size: var(--text-2xl);
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: var(--text-metric);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .stat-card-accent .stat-value {
-  color: var(--primary);
+  color: var(--accent-primary);
 }
 
 .stat-label {
   font-size: var(--text-xs);
-  color: var(--on-surface-variant);
-  font-weight: 500;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  order: -1;
 }
 
-.capture-cta {
-  max-width: none;
+/* --- "Check a prompt" — the app's signature interaction. Given the same
+   visual weight Raycast gives its command bar: a distinct elevated surface
+   rather than a flat filled button, with the hotkey shown as a real chip
+   (see desktop/DESIGN.md §11, Raycast reference). --- */
+
+.command-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin: 0 0 var(--space-6);
+  background: var(--surface-2);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.command-trigger:hover {
+  border-color: var(--accent-primary);
+  background: var(--surface-hover);
+}
+
+.command-trigger:active {
+  transform: scale(0.995);
+}
+
+.command-trigger-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-container);
+  color: var(--accent-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  margin-top: 0;
-  margin-bottom: var(--space-6);
+  flex-shrink: 0;
+}
+
+.command-trigger-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.command-trigger-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.command-trigger-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .capture-hotkey-label {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  opacity: 0.75;
   font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
 }
 
 .section-block {
@@ -428,12 +587,13 @@ h2 {
 .link-btn {
   background: none;
   border: none;
-  color: var(--primary);
+  color: var(--accent-primary);
   font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   padding: var(--space-1);
   font-family: inherit;
+  transition: opacity var(--duration-fast) ease;
 }
 
 .link-btn:hover {
@@ -442,14 +602,43 @@ h2 {
 
 .active-project-card,
 .mini-project-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-4);
 }
 
 .empty-note {
   padding: var(--space-2) 0;
+}
+
+/* Compact empty state — nested inside an already-titled section (Overview's
+   Active project / Recent activity), so it's smaller and solid-bordered
+   rather than the full dashed-border page-level .empty-state below. */
+.empty-state-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+}
+
+.empty-state-icon-frame {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state-icon-frame .empty-state-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--text-tertiary);
+  opacity: 1;
 }
 
 .activity-list {
@@ -466,10 +655,11 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: var(--space-3);
+  transition: border-color var(--duration-fast) ease;
 }
 
 .activity-title {
@@ -483,9 +673,10 @@ h2 {
 }
 
 .activity-savings {
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--primary);
+  font-weight: 600;
+  color: var(--accent-primary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -497,16 +688,23 @@ h2 {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-8) var(--space-4);
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-default);
   border-radius: var(--radius-md);
+}
+
+.empty-state-title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .empty-state-icon {
   width: 36px;
   height: 36px;
-  color: var(--on-surface-variant);
+  color: var(--text-tertiary);
   opacity: 0.6;
 }
 
@@ -517,19 +715,20 @@ h2 {
   align-items: center;
   gap: 6px;
   background: var(--primary-container);
-  border: 1px solid var(--primary);
-  color: var(--primary);
-  border-radius: var(--radius-full);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 600;
   padding: var(--space-2) var(--space-4);
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
+  transition: background var(--duration-fast) ease;
 }
 
 .pill-action:hover {
-  background: rgba(75, 226, 119, 0.2);
+  background: rgba(52, 211, 153, 0.2);
 }
 
 .pill-action:disabled {
@@ -547,15 +746,16 @@ h2 {
 }
 
 .project-item {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-4);
+  transition: border-color var(--duration-fast) ease;
 }
 
 .project-item.is-active {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px rgba(75, 226, 119, 0.2);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2);
 }
 
 .project-item-top {
@@ -619,10 +819,62 @@ h2 {
   background: var(--primary-container);
 }
 
-.error-text {
-  color: var(--error);
-  font-size: var(--text-sm);
+/* --- Semantic alert — replaces raw error-text paragraphs (Projects load/
+   link/rescan/remove errors, Settings display-name form). One component,
+   four color variants via data-variant, per desktop/DESIGN.md §8. Never a
+   full-color fill — a left accent border keeps it from shouting on a page
+   that otherwise has almost no color. --- */
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
   margin: 0 0 var(--space-3);
+}
+
+.alert[data-variant="error"] {
+  border-left-color: var(--error);
+}
+.alert[data-variant="error"] .alert-icon {
+  color: var(--error);
+}
+
+.alert[data-variant="warning"] {
+  border-left-color: var(--warning);
+}
+.alert[data-variant="warning"] .alert-icon {
+  color: var(--warning);
+}
+
+.alert[data-variant="info"] {
+  border-left-color: var(--accent-secondary);
+}
+.alert[data-variant="info"] .alert-icon {
+  color: var(--accent-secondary);
+}
+
+.alert[data-variant="success"] {
+  border-left-color: var(--accent-primary);
+}
+.alert[data-variant="success"] .alert-icon {
+  color: var(--accent-primary);
+}
+
+.alert-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alert-message {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
 /* --- Tools: full-width rows with a real toggle switch ------------------- */
@@ -637,21 +889,21 @@ h2 {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   cursor: pointer;
   min-height: 52px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease;
 }
 
 .tool-row:hover {
-  border-color: rgba(75, 226, 119, 0.4);
+  border-color: rgba(52, 211, 153, 0.4);
 }
 
 .tool-row.is-checked {
-  border-color: var(--primary);
+  border-color: var(--accent-primary);
   background: var(--primary-container);
 }
 
@@ -659,17 +911,17 @@ h2 {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
-  background: var(--surface-container);
+  background: var(--surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
 .tool-row.is-checked .tool-row-icon {
-  color: var(--primary);
-  background: rgba(75, 226, 119, 0.16);
+  color: var(--accent-primary);
+  background: rgba(52, 211, 153, 0.16);
 }
 
 .tool-row-label {
@@ -693,48 +945,48 @@ h2 {
 }
 
 .tool-row-toggle {
-  width: 40px;
-  height: 24px;
+  width: 36px;
+  height: 20px;
   border-radius: var(--radius-full);
-  background: var(--surface-container-high);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
   position: relative;
   flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
 
 .tool-row-toggle::after {
   content: "";
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--on-surface-variant);
-  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
+  background: var(--text-secondary);
+  transition: transform var(--duration-base) var(--ease-enter), background var(--duration-fast) ease;
 }
 
 .tool-row.is-checked .tool-row-toggle {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 
 .tool-row.is-checked .tool-row-toggle::after {
   transform: translateX(16px);
-  background: var(--on-primary);
+  background: var(--on-accent-primary);
 }
 
 .tool-row-input:focus-visible ~ .tool-row-toggle {
-  outline: 2px solid var(--secondary);
+  outline: 2px solid var(--accent-secondary);
   outline-offset: 2px;
 }
 
 /* --- Settings ------------------------------------------------------------ */
 
 .settings-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   margin-bottom: var(--space-2);
@@ -754,16 +1006,17 @@ h2 {
 .icon-btn {
   background: none;
   border: none;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
   display: flex;
   border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .icon-btn:hover {
-  color: var(--primary);
-  background: var(--surface-container);
+  color: var(--accent-primary);
+  background: var(--surface-2);
 }
 
 .settings-name-form {
@@ -780,10 +1033,10 @@ h2 {
 .settings-name-input {
   flex: 1;
   min-width: 0;
-  background: var(--surface-container);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
-  color: var(--on-background);
+  color: var(--text-primary);
   font-family: inherit;
   font-size: var(--text-md);
   padding: 6px 10px;
@@ -791,7 +1044,8 @@ h2 {
 
 .settings-name-input:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.25);
 }
 
 .settings-account-note {
@@ -802,7 +1056,7 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: var(--border);
+  background: var(--border-default);
   border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: var(--space-2);
@@ -812,38 +1066,29 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface);
+  background: var(--surface-1);
   padding: var(--space-3) var(--space-4);
 }
 
 .settings-row-label {
   font-size: var(--text-sm);
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
 }
 
 .settings-row-value {
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-container);
-  border: 1px solid var(--border);
-  color: var(--on-background);
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.theme-toggle-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+/* Destructive actions get their own zone, spatially separated from
+   ordinary settings rows (destructive-nav-separation guidance) — a divider
+   plus generous top spacing, not just a color change. */
+.settings-danger-zone {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* --- Usage ---------------------------------------------------------------- */
@@ -976,55 +1221,4 @@ h2 {
   font-size: var(--text-xs);
   text-align: center;
   margin-top: var(--space-2);
-}
-
-/* --- Theme-flip wipe animation ------------------------------------------
-   Adapted from the web app's light/dark ThemeProvider: the View Transitions
-   API captures the whole document as it looked immediately before the
-   toggle (::view-transition-old(root)) and immediately after
-   (::view-transition-new(root)). The old snapshot just sits still — no
-   animation — while the new snapshot reveals top-to-bottom via a clip-path
-   wipe, so it reads as a curtain dropping to unveil the new theme. */
-
-::view-transition-old(root) {
-  animation: none;
-}
-::view-transition-new(root) {
-  animation: theme-wipe 600ms cubic-bezier(0.76, 0, 0.24, 1) both;
-}
-@keyframes theme-wipe {
-  from {
-    clip-path: inset(0 0 100% 0);
-  }
-  to {
-    clip-path: inset(0 0 0% 0);
-  }
-}
-
-/* Fallback for a Chromium build without View Transitions support: a
-   translucent curtain scales down from the top of the window, the theme
-   class flips underneath it, then it unmounts to reveal the new theme
-   already in place. */
-.theme-wipe-curtain {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: var(--on-background);
-  opacity: 0.16;
-  transform: scaleY(0);
-  transform-origin: top;
-  pointer-events: none;
-  transition: transform 600ms cubic-bezier(0.76, 0, 0.24, 1);
-}
-.theme-wipe-curtain.is-active {
-  transform: scaleY(1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-new(root) {
-    animation: none;
-  }
-  .theme-wipe-curtain {
-    transition: none;
-  }
 }

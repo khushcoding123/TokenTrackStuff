@@ -497,15 +497,6 @@ if (!gotSingleInstanceLock) {
     return true;
   });
 
-  // --- Theme preference ---------------------------------------------------
-
-  ipcMain.handle("prefs:get-theme", () => loadPrefs().theme ?? "dark");
-
-  ipcMain.handle("prefs:set-theme", (_event, theme) => {
-    savePrefs({ theme });
-    return true;
-  });
-
   // --- Prompt capture window ----------------------------------------------
 
   ipcMain.handle("capture:open", () => {

@@ -20,16 +20,20 @@
 
   const AVAILABLE_TOOLS = [
     { id: "claude", label: "Claude", icon: "sparkle" },
-    { id: "chatgpt", label: "ChatGPT", icon: "bubble" },
+    { id: "chatgpt", label: "ChatGPT", icon: "knot" },
     { id: "vscode", label: "VS Code", icon: "brackets" },
     { id: "cursor", label: "Cursor", icon: "cursor" },
     { id: "other", label: "Other / terminal", icon: "terminal" },
   ];
 
+  // Stylized single-color glyphs evoking each tool's mark — not literal
+  // reproductions of trademarked logos (no bundled brand assets, and the
+  // CSP blocks fetching real ones remotely), but distinct from each other
+  // and from generic chat/app iconography.
   const TOOL_ICONS = {
     sparkle:
       '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
-    bubble: '<path d="M21 11.5a8.38 8.38 0 0 1-9 8.5 8.5 8.5 0 0 1-4-1L3 20l1-4a8.4 8.4 0 0 1-1-4 8.5 8.5 0 0 1 8.5-8.5H12a8.5 8.5 0 0 1 9 7.5Z"/>',
+    knot: '<circle cx="12" cy="7.5" r="3"/><circle cx="7" cy="15.5" r="3"/><circle cx="17" cy="15.5" r="3"/>',
     brackets: '<path d="m8 4-6 8 6 8M16 4l6 8-6 8"/>',
     cursor: '<path d="m4 4 7 17 2.5-7.5L21 11 4 4Z"/>',
     terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
@@ -39,71 +43,32 @@
     return `<svg class="icon ${extraClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${pathMarkup}</svg>`;
   }
 
-  // --- Theme toggle -----------------------------------------------------
-  // Adapted from the web app's ThemeProvider curtain-wipe transition: the
-  // View Transitions API is the primary path (clip-path wipe reveals the
-  // new theme top-to-bottom, old snapshot just sits still underneath); a
-  // scaling curtain div is the fallback for a Chromium build without it.
+  // --- Semantic alert (replaces raw error-text paragraphs) -----------------
+  // Reusable across Projects' load/link/rescan/remove errors and the
+  // Settings display-name form — one visual component, driven by a
+  // data-variant attribute, per desktop/DESIGN.md §8.
 
-  const SUN_PATH =
-    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
-  const MOON_PATH = '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>';
+  const ALERT_ICON_PATHS = {
+    error: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+    warning: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    success: '<path d="M20 7 9 18l-5-5"/>',
+  };
 
-  const btnToggleTheme = document.getElementById("btn-toggle-theme");
-  const themeToggleIcon = document.getElementById("theme-toggle-icon");
-  const themeToggleLabel = document.getElementById("theme-toggle-label");
-
-  let curtainActive = false;
-
-  function applyTheme(theme) {
-    document.documentElement.classList.toggle("light", theme === "light");
-    if (themeToggleIcon) themeToggleIcon.innerHTML = theme === "light" ? SUN_PATH : MOON_PATH;
-    if (themeToggleLabel) themeToggleLabel.textContent = theme === "light" ? "Light" : "Dark";
-  }
-
-  function playCurtainFallback(applyFn) {
-    if (curtainActive) return applyFn();
-    curtainActive = true;
-    const curtain = document.createElement("div");
-    curtain.className = "theme-wipe-curtain";
-    document.body.append(curtain);
-
-    requestAnimationFrame(() => curtain.classList.add("is-active"));
-
-    let applied = false;
-    const finish = () => {
-      if (applied) return;
-      applied = true;
-      applyFn();
-      curtain.remove();
-      curtainActive = false;
-    };
-    curtain.addEventListener("transitionend", finish, { once: true });
-    setTimeout(finish, 700); // safety net if transitionend doesn't fire
-  }
-
-  function toggleTheme() {
-    const next = document.documentElement.classList.contains("light") ? "dark" : "light";
-    const flip = () => {
-      applyTheme(next);
-      window.metriq.setTheme(next);
-    };
-
-    if (typeof document.startViewTransition === "function") {
-      const vt = document.startViewTransition(flip);
-      vt.finished.catch(() => {});
+  function setAlert(container, message, variant = "error") {
+    if (!container) return;
+    if (!message) {
+      container.classList.add("hidden");
+      container.innerHTML = "";
       return;
     }
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      flip();
-      return;
-    }
-    playCurtainFallback(flip);
+    container.dataset.variant = variant;
+    container.classList.remove("hidden");
+    container.innerHTML =
+      svgIcon(ALERT_ICON_PATHS[variant] || ALERT_ICON_PATHS.error, "alert-icon icon-sm") +
+      `<p class="alert-message"></p>`;
+    container.querySelector(".alert-message").textContent = message;
   }
-
-  btnToggleTheme?.addEventListener("click", toggleTheme);
-
-  window.metriq.getTheme().then((theme) => applyTheme(theme));
 
   // --- Page navigation ------------------------------------------------------
 
@@ -129,6 +94,8 @@
 
   btnGotoProjects?.addEventListener("click", () => showPage("projects"));
 
+  document.getElementById("btn-sidebar-avatar")?.addEventListener("click", () => showPage("settings"));
+
   // --- Auth views -----------------------------------------------------------
 
   function showLoggedOut() {
@@ -139,8 +106,9 @@
 
   function applyIdentity(session) {
     const displayName = session.name || session.email || "there";
-    document.getElementById("identity-name").textContent = displayName;
     document.getElementById("avatar-initial").textContent = displayName.charAt(0).toUpperCase();
+    const sidebarAvatar = document.getElementById("btn-sidebar-avatar");
+    if (sidebarAvatar) sidebarAvatar.title = `Signed in as ${displayName}`;
     document.getElementById("settings-identity-name").textContent = session.name || session.email;
     document.getElementById("settings-identity-email").textContent = session.email || "";
     document.getElementById("settings-avatar-initial").textContent = displayName.charAt(0).toUpperCase();
@@ -167,7 +135,7 @@
   const btnCancelName = document.getElementById("btn-cancel-name");
 
   function openNameForm() {
-    settingsNameError.classList.add("hidden");
+    setAlert(settingsNameError, "");
     settingsNameInput.value = document.getElementById("settings-identity-name").textContent;
     settingsNameDisplay.classList.add("hidden");
     settingsNameForm.classList.remove("hidden");
@@ -178,7 +146,7 @@
   function closeNameForm() {
     settingsNameForm.classList.add("hidden");
     settingsNameDisplay.classList.remove("hidden");
-    settingsNameError.classList.add("hidden");
+    setAlert(settingsNameError, "");
   }
 
   btnEditName?.addEventListener("click", openNameForm);
@@ -188,8 +156,7 @@
     e.preventDefault();
     const name = settingsNameInput.value.trim();
     if (!name) {
-      settingsNameError.textContent = "Name can't be empty.";
-      settingsNameError.classList.remove("hidden");
+      setAlert(settingsNameError, "Name can't be empty.", "error");
       return;
     }
     const saveBtn = settingsNameForm.querySelector("button[type=submit]");
@@ -200,8 +167,7 @@
       applyIdentity(updatedSession);
       closeNameForm();
     } catch (err) {
-      settingsNameError.textContent = err.message || "Couldn't update your name.";
-      settingsNameError.classList.remove("hidden");
+      setAlert(settingsNameError, err.message || "Couldn't update your name.", "error");
     }
     saveBtn.disabled = false;
     saveBtn.textContent = "Save";
@@ -255,17 +221,25 @@
   // --- Projects -----------------------------------------------------------
 
   function showProjectsError(message) {
-    projectsError.textContent = message;
-    projectsError.classList.remove("hidden");
+    setAlert(projectsError, message, "error");
   }
 
   function clearProjectsError() {
-    projectsError.classList.add("hidden");
+    setAlert(projectsError, "");
   }
 
   function renderOverviewActiveProject(activeProject) {
     if (!activeProject) {
-      overviewActiveProject.innerHTML = `<p class="muted empty-note">No project linked yet.</p>`;
+      overviewActiveProject.innerHTML = `
+        <div class="empty-state-compact">
+          <div class="empty-state-icon-frame">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+            </svg>
+          </div>
+          <p class="muted">No project linked yet.</p>
+        </div>
+      `;
       return;
     }
     overviewActiveProject.innerHTML = "";
