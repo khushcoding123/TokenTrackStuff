@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld("metriq", {
   getTools: () => ipcRenderer.invoke("prefs:get-tools"),
   setTools: (tools) => ipcRenderer.invoke("prefs:set-tools", tools),
 
+  getTheme: () => ipcRenderer.invoke("prefs:get-theme"),
+  setTheme: (theme) => ipcRenderer.invoke("prefs:set-theme", theme),
+
   openCapture: () => ipcRenderer.invoke("capture:open"),
   closeCapture: () => ipcRenderer.invoke("capture:close"),
   getCaptureContext: () => ipcRenderer.invoke("capture:get-context"),

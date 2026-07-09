@@ -70,6 +70,76 @@
     container.querySelector(".alert-message").textContent = message;
   }
 
+  // --- Theme toggle -----------------------------------------------------
+  // The View Transitions API is the primary path (clip-path wipe reveals
+  // the new theme top-to-bottom, old snapshot just sits still underneath);
+  // a scaling curtain div is the fallback for a Chromium build without it.
+
+  const SUN_PATH =
+    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  const MOON_PATH = '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>';
+
+  const btnToggleTheme = document.getElementById("btn-toggle-theme");
+  const themeToggleIcon = document.getElementById("theme-toggle-icon");
+  const themeToggleLabel = document.getElementById("theme-toggle-label");
+  const btnToggleThemeRail = document.getElementById("btn-toggle-theme-rail");
+  const themeToggleIconRail = document.getElementById("theme-toggle-icon-rail");
+
+  let curtainActive = false;
+
+  function applyTheme(theme) {
+    document.documentElement.classList.toggle("light", theme === "light");
+    const iconMarkup = theme === "light" ? SUN_PATH : MOON_PATH;
+    if (themeToggleIcon) themeToggleIcon.innerHTML = iconMarkup;
+    if (themeToggleIconRail) themeToggleIconRail.innerHTML = iconMarkup;
+    if (themeToggleLabel) themeToggleLabel.textContent = theme === "light" ? "Light" : "Dark";
+  }
+
+  function playCurtainFallback(applyFn) {
+    if (curtainActive) return applyFn();
+    curtainActive = true;
+    const curtain = document.createElement("div");
+    curtain.className = "theme-wipe-curtain";
+    document.body.append(curtain);
+
+    requestAnimationFrame(() => curtain.classList.add("is-active"));
+
+    let applied = false;
+    const finish = () => {
+      if (applied) return;
+      applied = true;
+      applyFn();
+      curtain.remove();
+      curtainActive = false;
+    };
+    curtain.addEventListener("transitionend", finish, { once: true });
+    setTimeout(finish, 700); // safety net if transitionend doesn't fire
+  }
+
+  function toggleTheme() {
+    const next = document.documentElement.classList.contains("light") ? "dark" : "light";
+    const flip = () => {
+      applyTheme(next);
+      window.metriq.setTheme(next);
+    };
+
+    if (typeof document.startViewTransition === "function") {
+      const vt = document.startViewTransition(flip);
+      vt.finished.catch(() => {});
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      flip();
+      return;
+    }
+    playCurtainFallback(flip);
+  }
+
+  btnToggleTheme?.addEventListener("click", toggleTheme);
+  btnToggleThemeRail?.addEventListener("click", toggleTheme);
+
+  window.metriq.getTheme().then((theme) => applyTheme(theme));
+
   // --- Page navigation ------------------------------------------------------
 
   const navButtons = document.querySelectorAll(".nav-btn");

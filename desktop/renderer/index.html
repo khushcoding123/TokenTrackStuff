@@ -76,6 +76,9 @@
           </div>
 
           <div class="sidebar-footer">
+            <button id="btn-toggle-theme-rail" class="sidebar-icon-btn" title="Toggle theme" aria-label="Toggle theme">
+              <svg id="theme-toggle-icon-rail" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></svg>
+            </button>
             <button id="btn-sidebar-avatar" class="sidebar-avatar" data-page="settings" title="Account" aria-label="Account">
               <span id="avatar-initial">?</span>
             </button>
@@ -308,21 +311,14 @@
               Email and password are managed on your account — sign-in method changes aren't supported from here yet.
             </p>
 
-            <!--
-              Phase 5 decision point: the light/dark theme toggle that used to
-              live here (and its rail counterpart) has been retired, not
-              silently dropped. desktop/DESIGN.md commits this app to a
-              single dark-layered surface system (Linear/Raycast-style); a
-              user-facing light mode would mean maintaining a second,
-              fully-specified palette in parallel indefinitely for a toggle
-              the rest of this redesign explicitly designs against. The
-              underlying support (:root.light tokens, prefs:get/set-theme
-              IPC, curtain-wipe transition) has been removed accordingly —
-              see the Phase 1→5 design-review conversation for the approval
-              trail if this ever needs reconsidering.
-            -->
-
             <div class="settings-list">
+              <div class="settings-row">
+                <span class="settings-row-label">Appearance</span>
+                <button id="btn-toggle-theme" class="theme-toggle-btn">
+                  <svg id="theme-toggle-icon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></svg>
+                  <span id="theme-toggle-label">Dark</span>
+                </button>
+              </div>
               <div class="settings-row">
                 <span class="settings-row-label">Capture hotkey</span>
                 <span id="settings-hotkey-label" class="settings-row-value"></span>

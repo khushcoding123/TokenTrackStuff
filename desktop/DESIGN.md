@@ -516,11 +516,9 @@ Included here for review; **not applied yet** — Phase 1 implements this.
 }
 ```
 
-**Resolved in Phase 5:** the `:root.light` override block, the Settings-page
-theme toggle, its sidebar-rail counterpart, and the supporting
-`prefs:get/set-theme` IPC + curtain-wipe transition have all been removed.
-The toggle stayed functional through Phases 1–4 by design; Phase 5 is where
-retiring it (approved during the Phase 0 review) became a visible, explicit
-change rather than something dropped silently along the way — see the
-comment left in `desktop/renderer/index.html`'s Settings section and in
-`styles.css` at the former `:root.light` location.
+**Update:** Phase 5 briefly retired light mode in favor of a dark-only
+system. That was reversed shortly after at explicit request — light mode
+(the `:root.light` token block, the Settings-page toggle, its sidebar-rail
+counterpart, and the `prefs:get/set-theme` IPC + curtain-wipe transition)
+is back and fully supported, kept in sync with every token this system
+defines so light and dark stay visually equivalent as the design evolves.
