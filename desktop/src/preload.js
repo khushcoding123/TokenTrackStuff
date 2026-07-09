@@ -51,6 +51,12 @@ contextBridge.exposeInMainWorld("metriq", {
   recommendPrompt: (prompt) => ipcRenderer.invoke("capture:recommend", prompt),
   getSeededPrompt: () => ipcRenderer.invoke("capture:get-seeded"),
   applyPrompt: (text, stats) => ipcRenderer.invoke("capture:apply", text, stats),
+  // Fired when a new clipboard prompt arrives while the popup is already open.
+  onSeedPrompt: (callback) => {
+    const listener = (_event, prompt) => callback(prompt);
+    ipcRenderer.on("capture:seed", listener);
+    return () => ipcRenderer.removeListener("capture:seed", listener);
+  },
 
   // Auto-capture toggle + OS permissions.
   getAutoCapture: () => ipcRenderer.invoke("settings:get-autocapture"),

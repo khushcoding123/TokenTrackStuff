@@ -73,10 +73,30 @@ class PromptWatcher extends EventEmitter {
     }
   }
 
+  // Seed `last` without emitting — used when starting so pre-existing clipboard
+  // content doesn't immediately trigger a popup.
+  prime(text) {
+    this.last = String(text || "").trim();
+  }
+
   /** Dev/test hook: inject a prompt as if the source produced it. */
   feed(prompt) {
     this.consider(prompt);
   }
 }
 
-module.exports = { PromptWatcher, nullSource };
+// Heuristic: does this clipboard text look like an AI-coding prompt (vs. copied
+// code, a URL, a file path, or a stray token)? Kept pure and exported so it can
+// be unit-tested without Electron.
+function looksLikePrompt(text) {
+  const t = String(text || "").trim();
+  if (t.length < 15 || t.length > 4000) return false; // too short / huge paste
+  if (!/\s/.test(t)) return false; // a single token
+  if (t.split(/\s+/).length < 3) return false; // needs a few words
+  if (/^https?:\/\//i.test(t)) return false; // a URL
+  if (/^[A-Za-z]:[\\/]/.test(t) || /^\/[\w./-]+$/.test(t)) return false; // a path
+  if ((t.match(/[{};=<>]/g) || []).length > 4) return false; // looks like code
+  return /[a-z]{3,}/i.test(t); // has real words
+}
+
+module.exports = { PromptWatcher, nullSource, looksLikePrompt };

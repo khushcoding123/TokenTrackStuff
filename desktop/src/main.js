@@ -10,7 +10,7 @@ const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scan
 const { optimize } = require("../../packages/core/rewrite.js");
 const { recommend } = require("../../packages/optimize/index.js");
 const permissions = require("./permissions");
-const { PromptWatcher } = require("./prompt-watcher");
+const { PromptWatcher, looksLikePrompt } = require("./prompt-watcher");
 
 const WEB_BASE_URL = process.env.METRIQ_WEB_URL || "https://tokenpilot-mocha.vercel.app";
 const CAPTURE_HOTKEY = process.env.METRIQ_CAPTURE_HOTKEY || "CommandOrControl+Shift+M";
@@ -50,17 +50,33 @@ let promptWatcher = null;
 // When auto-capture detects a draft prompt, we stash it here and open the
 // capture window; the window's renderer pulls it via "capture:get-seeded".
 let seededPrompt = null;
+// The last improved prompt we put on the clipboard — so copying our own output
+// doesn't re-trigger the popup in a loop.
+let lastAppliedText = "";
+
+// Auto-capture "source": watch the clipboard for prompt-like text. We can't read
+// another app's input box directly (see prompt-watcher.js / the UIA probe), so
+// the trigger is you copying your prompt (Ctrl+C). Only your clipboard is read,
+// and only locally — nothing is sent anywhere.
+function clipboardPromptSource() {
+  const text = clipboard.readText();
+  if (!text || text === lastAppliedText) return "";
+  return looksLikePrompt(text) ? text : "";
+}
 
 // Lazily create the background watcher and route detected prompts into the
-// suggestion popup. The watcher's source (reading the other app's text) is the
-// gated Phase-5 seam — see prompt-watcher.js; by default it reads nothing.
+// side popup. Enabling auto-capture starts it (see settings:set-autocapture).
 function getWatcher() {
   if (!promptWatcher) {
-    promptWatcher = new PromptWatcher();
+    promptWatcher = new PromptWatcher({ source: clipboardPromptSource, intervalMs: 1200 });
     promptWatcher.on("prompt", (prompt) => {
       seededPrompt = prompt;
-      if (!captureWindow) createCaptureWindow();
-      else captureWindow.focus();
+      if (!captureWindow) {
+        createCaptureWindow({ focus: false }); // passive side popup, doesn't steal focus
+      } else {
+        // Popup already open — push the new prompt into it and re-run.
+        captureWindow.webContents.send("capture:seed", prompt);
+      }
     });
   }
   return promptWatcher;
@@ -115,27 +131,32 @@ function createWindow() {
   return mainWindow;
 }
 
-// The floating prompt-capture window — small, always-on-top, positioned
-// near the cursor so it feels like a quick-entry palette rather than a
-// full app window. Toggled by the global hotkey or a button in the main
-// window; a second trigger while it's open just hides it again.
-function createCaptureWindow() {
+// The prompt-suggestion popup — a small, always-on-top window docked to the
+// bottom-right so it reads as a side popup, not a full app window.
+//   - Manual (hotkey / button): opens focused so you can type into it, and
+//     dismisses when you click away (Spotlight-style).
+//   - Auto (clipboard trigger): opens *inactive* so it doesn't steal focus
+//     while you work, and stays until you copy or press Esc.
+function createCaptureWindow(opts = {}) {
+  const focusOnShow = opts.focus !== false;
   const cursor = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(cursor);
-  const width = 480;
-  const height = 420;
+  const width = 380;
+  const height = 480;
+  const margin = 24;
 
   captureWindow = new BrowserWindow({
     width,
     height,
-    x: Math.round(display.workArea.x + (display.workArea.width - width) / 2),
-    y: Math.round(display.workArea.y + (display.workArea.height - height) / 3),
+    x: Math.round(display.workArea.x + display.workArea.width - width - margin),
+    y: Math.round(display.workArea.y + display.workArea.height - height - margin),
     resizable: true,
     minimizable: false,
     maximizable: false,
     alwaysOnTop: true,
     frame: true,
-    title: "Metriq — Capture",
+    skipTaskbar: true,
+    title: "Metriq — Suggestion",
     backgroundColor: "#0B0F14",
     show: false,
     webPreferences: {
@@ -146,28 +167,27 @@ function createCaptureWindow() {
     },
   });
 
-  // Newly created/shown windows can receive a spurious initial blur before
-  // OS focus genuinely settles on them (window-manager-dependent). Ignore
-  // blur events for a brief grace period right after showing so the window
-  // can't vanish before the user gets a chance to use it; genuine "click
-  // away" dismissal past that point still works immediately.
   let shownAt = 0;
   const BLUR_GRACE_MS = 400;
 
   captureWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   captureWindow.loadFile(path.join(__dirname, "..", "renderer", "capture.html"));
   captureWindow.once("ready-to-show", () => {
-    captureWindow.show();
+    if (focusOnShow) captureWindow.show();
+    else captureWindow.showInactive(); // side popup: appear without stealing focus
     shownAt = Date.now();
   });
   captureWindow.on("closed", () => {
     captureWindow = null;
   });
-  captureWindow.on("blur", () => {
-    // Quick-palette feel: clicking away dismisses it, like Spotlight.
-    if (Date.now() - shownAt < BLUR_GRACE_MS) return;
-    captureWindow?.close();
-  });
+  // Only the focused (manual) palette auto-dismisses on blur. The passive side
+  // popup must survive you clicking back into your editor to paste.
+  if (focusOnShow) {
+    captureWindow.on("blur", () => {
+      if (Date.now() - shownAt < BLUR_GRACE_MS) return;
+      captureWindow?.close();
+    });
+  }
 
   return captureWindow;
 }
@@ -358,7 +378,9 @@ if (!gotSingleInstanceLock) {
     if (loadPrefs().autoCapture) {
       const status = permissions.getPermissionStatus();
       if (status.accessibility === "granted" || status.accessibility === "not-required") {
-        getWatcher().start();
+        const w = getWatcher();
+        w.prime(clipboard.readText()); // don't pop for whatever's already copied
+        w.start();
       }
     }
 
@@ -536,7 +558,9 @@ if (!gotSingleInstanceLock) {
       const permission = permissions.ensureCapturePermission();
       if (!permission.ok) return { ok: false, enabled: false, permission };
       savePrefs({ autoCapture: true });
-      getWatcher().start();
+      const w = getWatcher();
+      w.prime(clipboard.readText()); // don't pop for whatever's already copied
+      w.start();
       return { ok: true, enabled: true, permission };
     }
     savePrefs({ autoCapture: false });
@@ -585,6 +609,7 @@ if (!gotSingleInstanceLock) {
 
   ipcMain.handle("capture:copy", (_event, text, stats) => {
     clipboard.writeText(text);
+    lastAppliedText = text; // don't let our own output re-trigger the popup
     if (stats) {
       const activeProject = loadPrefs().activeProject;
       recordCapture({ ...stats, projectName: activeProject?.name ?? null });
@@ -619,6 +644,7 @@ if (!gotSingleInstanceLock) {
   // the clipboard for a one-keystroke paste and record the saving.
   ipcMain.handle("capture:apply", (_event, text, stats) => {
     clipboard.writeText(text);
+    lastAppliedText = text; // don't let our own output re-trigger the popup
     if (stats) {
       const activeProject = loadPrefs().activeProject;
       recordCapture({ ...stats, projectName: activeProject?.name ?? null });

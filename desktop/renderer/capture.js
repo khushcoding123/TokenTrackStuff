@@ -122,5 +122,12 @@
     input.value = seeded;
     run(seeded.trim());
   }
+
+  // While this popup stays open, a newly-copied prompt is pushed in live.
+  window.metriq.onSeedPrompt((prompt) => {
+    input.value = prompt;
+    run(String(prompt).trim());
+  });
+
   input.focus();
 })();
