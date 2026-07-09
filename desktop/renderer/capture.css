@@ -36,12 +36,37 @@
   font-size: 13px;
 }
 
+.capture-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .capture-context {
   font-size: 11px;
-  max-width: 55%;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.capture-close {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.capture-close:hover {
+  background: var(--surface);
+  color: var(--on-background);
 }
 
 .capture-input {

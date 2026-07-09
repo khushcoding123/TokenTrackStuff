@@ -20,6 +20,7 @@
   const focusedEl = document.getElementById("capture-focused");
   const btnApply = document.getElementById("btn-apply");
   const btnCopy = document.getElementById("btn-copy");
+  const btnClose = document.getElementById("btn-close");
 
   // Show what the recommendation is scoped to (connected repo, if any).
   const repoUrl = await window.metriq.getCaptureRepoUrl();
@@ -97,12 +98,14 @@
     debounceTimer = setTimeout(() => run(prompt), 350);
   });
 
-  // Approve -> apply (clipboard today; the cross-app write-back is the gated seam).
+  // Approve -> put the improved prompt on the clipboard. The popup STAYS OPEN so
+  // you can paste it (and keep working through more prompts); close it with the
+  // × or Esc. Cross-app write-back is the gated seam, so this is clipboard-only.
   btnApply.addEventListener("click", async () => {
     if (!latestImproved) return;
     await window.metriq.applyPrompt(latestImproved, latestStats);
     btnApply.textContent = "Applied — paste with ⌘/Ctrl+V";
-    setTimeout(() => window.metriq.closeCapture(), 900);
+    setTimeout(() => (btnApply.textContent = "Approve & apply"), 1600);
   });
 
   btnCopy.addEventListener("click", async () => {
@@ -111,6 +114,8 @@
     btnCopy.textContent = "Copied!";
     setTimeout(() => (btnCopy.textContent = "Copy"), 1200);
   });
+
+  btnClose.addEventListener("click", () => window.metriq.closeCapture());
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") window.metriq.closeCapture();

@@ -17,7 +17,10 @@
           <div class="brand-mark brand-mark-sm">M</div>
           <span class="brand-name brand-name-sm">Metriq</span>
         </div>
-        <span id="capture-context" class="capture-context muted">No repo connected</span>
+        <div class="capture-header-right">
+          <span id="capture-context" class="capture-context muted">No repo connected</span>
+          <button id="btn-close" class="capture-close" aria-label="Close" title="Close (Esc)">×</button>
+        </div>
       </div>
 
       <textarea
@@ -50,7 +53,7 @@
         </div>
       </div>
 
-      <p class="capture-hint muted">Esc to close · updates as you type</p>
+      <p class="capture-hint muted">Stays open · copy another prompt to refresh · Esc or × to close</p>
     </div>
     <script src="capture.js"></script>
   </body>

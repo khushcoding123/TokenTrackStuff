@@ -167,27 +167,18 @@ function createCaptureWindow(opts = {}) {
     },
   });
 
-  let shownAt = 0;
-  const BLUR_GRACE_MS = 400;
-
   captureWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   captureWindow.loadFile(path.join(__dirname, "..", "renderer", "capture.html"));
   captureWindow.once("ready-to-show", () => {
     if (focusOnShow) captureWindow.show();
     else captureWindow.showInactive(); // side popup: appear without stealing focus
-    shownAt = Date.now();
   });
   captureWindow.on("closed", () => {
     captureWindow = null;
   });
-  // Only the focused (manual) palette auto-dismisses on blur. The passive side
-  // popup must survive you clicking back into your editor to paste.
-  if (focusOnShow) {
-    captureWindow.on("blur", () => {
-      if (Date.now() - shownAt < BLUR_GRACE_MS) return;
-      captureWindow?.close();
-    });
-  }
+  // The popup is persistent — it stays until you close it (× or Esc), so you can
+  // paste the result and keep working through several prompts. It does NOT
+  // auto-dismiss when you click back into your editor.
 
   return captureWindow;
 }
