@@ -519,6 +519,8 @@
   const usageContent = document.getElementById("usage-content");
   const usageTiles = document.getElementById("usage-tiles");
   const usageDailyChart = document.getElementById("usage-daily-chart");
+  const usageDailyLabels = document.getElementById("usage-daily-labels");
+  const usageDailyPeak = document.getElementById("usage-daily-peak");
   const usageInsights = document.getElementById("usage-insights");
   const usageModels = document.getElementById("usage-models");
   const usageSessions = document.getElementById("usage-sessions");
@@ -532,6 +534,10 @@
     if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
     if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
     return String(Math.round(n || 0));
+  }
+
+  function fmtShortDate(dateStr) {
+    return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
   function usd(n) {
@@ -634,9 +640,26 @@
       const bar = document.createElement("div");
       bar.className = "usage-bar";
       bar.style.height = `${Math.max((d.totalTokens / dmax) * 100, 1)}%`;
-      bar.title = `${d.date} · ${fmtTok(d.totalTokens)} tokens`;
+      bar.title = `${fmtShortDate(d.date)} · ${fmtTok(d.totalTokens)} tokens`;
       usageDailyChart.append(bar);
     }
+
+    // A handful of date ticks under the bars (first/middle/last) so the
+    // range has a reference point without crowding — exact value + date
+    // for any single day is still available via the bar's hover tooltip.
+    usageDailyLabels.innerHTML = "";
+    if (daily.length) {
+      const tickIdxs = [...new Set([0, Math.floor((daily.length - 1) / 2), daily.length - 1])];
+      for (const i of tickIdxs) {
+        const span = document.createElement("span");
+        span.textContent = fmtShortDate(daily[i].date);
+        usageDailyLabels.append(span);
+      }
+    }
+
+    const peakDay = daily.reduce((max, d) => (!max || d.totalTokens > max.totalTokens ? d : max), null);
+    usageDailyPeak.textContent =
+      peakDay && peakDay.totalTokens > 0 ? `Peak: ${fmtTok(peakDay.totalTokens)} on ${fmtShortDate(peakDay.date)}` : "";
 
     const insights = data.insights || [];
     usageInsights.innerHTML = "";

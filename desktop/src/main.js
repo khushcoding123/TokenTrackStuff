@@ -390,6 +390,21 @@ if (!gotSingleInstanceLock) {
   // path (the web app gets this for free from its cookie-based SDK
   // middleware — the desktop app has to do it by hand since it holds a
   // bearer token instead).
+  // On any failure that means "this session can no longer be trusted"
+  // (expired access token with no way to refresh it, or a refresh attempt
+  // that itself gets rejected), clear it and tell the renderer to drop back
+  // to the logged-out screen — instead of leaving the user staring at a
+  // signed-in-looking shell with a raw error banner and no way forward
+  // except quitting the app.
+  function forceLogout() {
+    clearSession();
+    updateTrayMenu();
+    mainWindow?.webContents.send("auth:logged-out");
+    const err = new Error("Your session expired — please sign in again.");
+    err.code = "NOT_AUTHENTICATED";
+    return err;
+  }
+
   async function withAuthRetry(fn) {
     const session = loadSession();
     if (!session?.token) {
@@ -400,16 +415,17 @@ if (!gotSingleInstanceLock) {
     try {
       return await fn(session.token);
     } catch (err) {
-      if (err.status !== 401 || !session.refreshToken) throw err;
+      if (err.status !== 401) throw err;
+      // Sessions saved before refresh-token support existed have no
+      // refreshToken to fall back on — that's not a bug to surface as a raw
+      // 401, it just means this session can only be fixed by logging in
+      // again (which will store one going forward).
+      if (!session.refreshToken) throw forceLogout();
       let refreshed;
       try {
         refreshed = await insforge.refreshSession(session.refreshToken);
       } catch {
-        clearSession();
-        updateTrayMenu();
-        const authErr = new Error("Your session expired — please sign in again.");
-        authErr.code = "NOT_AUTHENTICATED";
-        throw authErr;
+        throw forceLogout();
       }
       const updated = {
         ...session,
