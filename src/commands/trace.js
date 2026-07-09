@@ -8,11 +8,13 @@
 
 import crypto from "node:crypto";
 import { watch } from "node:fs";
+import { spawn } from "node:child_process";
 
 import { getClaudeDirs, loadClaudeRecords } from "../core/usage/claude.js";
 import { getCodexSessionsDir, loadCodexUsage } from "../core/usage/codex.js";
 import { aggregate } from "../core/usage/aggregate.js";
 import { generateInsights } from "../core/usage/insights.js";
+import { analyzeCurrentSession } from "../core/usage/behavior.js";
 import { createTraceServer } from "./trace-server.js";
 import { colors } from "../ui/colors.js";
 
@@ -45,12 +47,30 @@ function buildPayload(days) {
     generatedAt: new Date().toISOString(),
     rateLimits,
     insights: generateInsights(agg, rateLimits),
+    currentSession: analyzeCurrentSession(records, { rateLimits }),
     ...agg,
   };
 }
 
 const fmtTok = (n) =>
   n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n));
+
+// Open a URL in the default browser without any dependencies. Best-effort:
+// if it fails the printed URL still works.
+function openInBrowser(url) {
+  const [cmd, args] =
+    process.platform === "darwin"
+      ? ["open", [url]]
+      : process.platform === "win32"
+        ? ["cmd", ["/c", "start", "", url]]
+        : ["xdg-open", [url]];
+  try {
+    spawn(cmd, args, { stdio: "ignore", detached: true }).unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function runTrace(flags = {}) {
   let defaultDays = parseInt(flags.days, 10);
@@ -122,6 +142,10 @@ export async function runTrace(flags = {}) {
   if (!watching) console.log(`  ${c.gray("! live file-watch unavailable — dashboard rescans on refresh")}`);
   console.log(`\n  → dashboard: ${c.cyan(url)}`);
   console.log(`    ${c.gray("localhost only · token-guarded · press Ctrl-C to stop")}\n`);
+
+  // Auto-open the dashboard so starting the app IS opening the dashboard.
+  // --no-open skips it (e.g. when scripting or already have a tab).
+  if (flags.open !== false) openInBrowser(url);
 
   process.on("SIGINT", () => {
     console.log("\n  stopped.\n");
