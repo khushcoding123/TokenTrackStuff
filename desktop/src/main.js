@@ -8,6 +8,9 @@ const { recordCapture, getSummary } = require("./usage-stats");
 const insforge = require("./insforge-client");
 const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scanner.js");
 const { optimize } = require("../../packages/core/rewrite.js");
+const { recommend } = require("../../packages/optimize/index.js");
+const permissions = require("./permissions");
+const { PromptWatcher } = require("./prompt-watcher");
 
 const WEB_BASE_URL = process.env.METRIQ_WEB_URL || "https://tokenpilot-mocha.vercel.app";
 const CAPTURE_HOTKEY = process.env.METRIQ_CAPTURE_HOTKEY || "CommandOrControl+Shift+M";
@@ -43,6 +46,25 @@ if (process.env.METRIQ_E2E_TEST === "1") {
 let mainWindow = null;
 let captureWindow = null;
 let tray = null;
+let promptWatcher = null;
+// When auto-capture detects a draft prompt, we stash it here and open the
+// capture window; the window's renderer pulls it via "capture:get-seeded".
+let seededPrompt = null;
+
+// Lazily create the background watcher and route detected prompts into the
+// suggestion popup. The watcher's source (reading the other app's text) is the
+// gated Phase-5 seam — see prompt-watcher.js; by default it reads nothing.
+function getWatcher() {
+  if (!promptWatcher) {
+    promptWatcher = new PromptWatcher();
+    promptWatcher.on("prompt", (prompt) => {
+      seededPrompt = prompt;
+      if (!captureWindow) createCaptureWindow();
+      else captureWindow.focus();
+    });
+  }
+  return promptWatcher;
+}
 
 // --- Protocol registration ---------------------------------------------
 
@@ -166,6 +188,10 @@ if (process.env.METRIQ_E2E_TEST === "1") {
   // evaluate needs to resolve its result. Closing it from here (the main
   // process's own persistent context) avoids that self-inflicted race.
   global.__metriqTest.closeCaptureWindow = () => captureWindow?.close();
+  // Feed a prompt as if the background watcher's source produced it, so the
+  // end-to-end auto-capture -> popup flow can be exercised without a real
+  // cross-app reader.
+  global.__metriqTest.feedPrompt = (prompt) => getWatcher().feed(prompt);
 }
 
 function createTray() {
@@ -327,6 +353,15 @@ if (!gotSingleInstanceLock) {
       console.warn(`Could not register global hotkey ${CAPTURE_HOTKEY} (already in use?)`);
     }
 
+    // Resume background prompt-watching if the user left it on — but only if
+    // the OS permission is still in place (they may have revoked it).
+    if (loadPrefs().autoCapture) {
+      const status = permissions.getPermissionStatus();
+      if (status.accessibility === "granted" || status.accessibility === "not-required") {
+        getWatcher().start();
+      }
+    }
+
     // Windows/Linux cold start via protocol link: the URL is a plain argv
     // entry on this very first launch.
     maybeHandleArgv(process.argv);
@@ -478,6 +513,44 @@ if (!gotSingleInstanceLock) {
     return true;
   });
 
+  // --- Auto-capture (background prompt watching) + permissions -------------
+
+  ipcMain.handle("permissions:status", () => permissions.getPermissionStatus());
+
+  ipcMain.handle("permissions:open-settings", (_event, which) => {
+    if (which === "screen") permissions.openScreenRecordingSettings();
+    else permissions.openAccessibilitySettings();
+    return true;
+  });
+
+  ipcMain.handle("settings:get-autocapture", () => ({
+    enabled: loadPrefs().autoCapture ?? false,
+    running: getWatcher().isRunning(),
+    permission: permissions.getPermissionStatus(),
+  }));
+
+  // Turning it on requests the OS permission first; if denied, we don't enable
+  // (and report back so the UI can guide the user to Settings). Off-by-default.
+  ipcMain.handle("settings:set-autocapture", (_event, enabled) => {
+    if (enabled) {
+      const permission = permissions.ensureCapturePermission();
+      if (!permission.ok) return { ok: false, enabled: false, permission };
+      savePrefs({ autoCapture: true });
+      getWatcher().start();
+      return { ok: true, enabled: true, permission };
+    }
+    savePrefs({ autoCapture: false });
+    getWatcher().stop();
+    return { ok: true, enabled: false };
+  });
+
+  ipcMain.handle("settings:get-repo-url", () => loadPrefs().captureRepoUrl ?? "");
+
+  ipcMain.handle("settings:set-repo-url", (_event, url) => {
+    savePrefs({ captureRepoUrl: url ? String(url).trim() : null });
+    return true;
+  });
+
   // --- Prompt capture window ----------------------------------------------
 
   ipcMain.handle("capture:open", () => {
@@ -517,6 +590,40 @@ if (!gotSingleInstanceLock) {
       recordCapture({ ...stats, projectName: activeProject?.name ?? null });
     }
     return true;
+  });
+
+  // GitHub-aware recommendation for the capture window: uses the connected repo
+  // URL to name the exact files to inspect. Shares @metriq/optimize with the
+  // web /optimize page, so the CLI-less desktop flow and the web give identical
+  // improved prompts. Falls back to a prompt-only rewrite if the repo read fails.
+  ipcMain.handle("capture:recommend", async (_event, prompt) => {
+    const repoUrl = loadPrefs().captureRepoUrl || null;
+    try {
+      return await recommend(prompt, { repoUrl });
+    } catch (e) {
+      const fallback = await recommend(prompt, {});
+      return { ...fallback, repoError: e.message };
+    }
+  });
+
+  // The prompt the background watcher seeded the window with (one-shot).
+  ipcMain.handle("capture:get-seeded", () => {
+    const p = seededPrompt;
+    seededPrompt = null;
+    return p;
+  });
+
+  // Approve -> apply the improved prompt.
+  // APPLY-BACK SEAM: writing text into the *other* app's chatbox needs OS-native
+  // keystroke / accessibility injection (Phase 5, gated). Today we place it on
+  // the clipboard for a one-keystroke paste and record the saving.
+  ipcMain.handle("capture:apply", (_event, text, stats) => {
+    clipboard.writeText(text);
+    if (stats) {
+      const activeProject = loadPrefs().activeProject;
+      recordCapture({ ...stats, projectName: activeProject?.name ?? null });
+    }
+    return { ok: true, applied: "clipboard" };
   });
 
   // --- Usage stats (Overview / Sustainability pages) ---------------------

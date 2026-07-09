@@ -47,5 +47,18 @@ contextBridge.exposeInMainWorld("metriq", {
   analyzePrompt: (prompt) => ipcRenderer.invoke("capture:analyze", prompt),
   copyToClipboard: (text, stats) => ipcRenderer.invoke("capture:copy", text, stats),
 
+  // GitHub-aware recommendation + auto-capture apply-back.
+  recommendPrompt: (prompt) => ipcRenderer.invoke("capture:recommend", prompt),
+  getSeededPrompt: () => ipcRenderer.invoke("capture:get-seeded"),
+  applyPrompt: (text, stats) => ipcRenderer.invoke("capture:apply", text, stats),
+
+  // Auto-capture toggle + OS permissions.
+  getAutoCapture: () => ipcRenderer.invoke("settings:get-autocapture"),
+  setAutoCapture: (enabled) => ipcRenderer.invoke("settings:set-autocapture", enabled),
+  getPermissionStatus: () => ipcRenderer.invoke("permissions:status"),
+  openPermissionSettings: (which) => ipcRenderer.invoke("permissions:open-settings", which),
+  getCaptureRepoUrl: () => ipcRenderer.invoke("settings:get-repo-url"),
+  setCaptureRepoUrl: (url) => ipcRenderer.invoke("settings:set-repo-url", url),
+
   getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
 });

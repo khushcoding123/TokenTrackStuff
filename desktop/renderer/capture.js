@@ -1,3 +1,12 @@
+// Capture window logic.
+//
+// Two ways a prompt arrives here:
+//   1. Manual — the user types/pastes into the textarea.
+//   2. Auto — the background watcher detected a draft in the user's AI tool and
+//      seeded it (see "capture:get-seeded" in main.js); we prefill and run.
+// Either way it goes through the same GitHub-aware recommendation and the same
+// "Approve & apply" action.
+
 (async function () {
   const input = document.getElementById("capture-input");
   const contextEl = document.getElementById("capture-context");
@@ -6,45 +15,76 @@
   const scoreEl = document.getElementById("capture-score");
   const savingsEl = document.getElementById("capture-savings");
   const issuesEl = document.getElementById("capture-issues");
+  const filesWrap = document.getElementById("capture-files-wrap");
+  const filesEl = document.getElementById("capture-files");
   const focusedEl = document.getElementById("capture-focused");
+  const btnApply = document.getElementById("btn-apply");
   const btnCopy = document.getElementById("btn-copy");
 
-  const { activeProject } = await window.metriq.getCaptureContext();
-  contextEl.textContent = activeProject ? `Checking against ${activeProject.name}` : "No project linked";
+  // Show what the recommendation is scoped to (connected repo, if any).
+  const repoUrl = await window.metriq.getCaptureRepoUrl();
+  contextEl.textContent = repoUrl ? `Scoped to ${shortRepo(repoUrl)}` : "No repo connected";
 
   let debounceTimer = null;
-  let latestFocusedPrompt = "";
+  let latestImproved = "";
   let latestStats = null;
 
-  function renderResult(result) {
+  function shortRepo(url) {
+    const m = String(url).match(/github\.com[/:]([^/]+\/[^/.]+)/i);
+    return m ? m[1] : url;
+  }
+
+  function renderResult(rec) {
     resultEl.classList.remove("hidden");
-    ratingEl.textContent = result.rating;
-    ratingEl.className = `capture-badge rating-${result.rating}`;
-    scoreEl.textContent = `breadth ${result.breadthScore}/100`;
-    savingsEl.textContent = result.savedTokens > 0 ? `saves ~${result.savedTokens} tokens (${result.savedPct}%)` : "";
+
+    const a = rec.analysis || {};
+    ratingEl.textContent = a.rating || "—";
+    ratingEl.className = `capture-badge rating-${a.rating || "moderate"}`;
+    scoreEl.textContent = `breadth ${a.breadthScore ?? "—"}/100`;
+
+    const s = rec.tokenSaving || {};
+    savingsEl.textContent = s.savedTokens > 0 ? `saves ~${s.savedTokens} tokens (${s.savedPct}%)` : "";
 
     issuesEl.innerHTML = "";
-    for (const issue of result.issues.slice(0, 3)) {
+    for (const issue of (a.issues || []).slice(0, 2)) {
       const li = document.createElement("li");
       li.textContent = `• ${issue.message}`;
       issuesEl.append(li);
     }
 
-    focusedEl.textContent = result.focusedPrompt;
-    latestFocusedPrompt = result.focusedPrompt;
+    // Relevant files from the connected GitHub repo.
+    const files = rec.relevantFiles || [];
+    if (files.length) {
+      filesWrap.classList.remove("hidden");
+      filesEl.innerHTML = "";
+      for (const f of files) {
+        const li = document.createElement("li");
+        li.textContent = f.path;
+        li.title = (f.reasons || []).join(" · ");
+        filesEl.append(li);
+      }
+    } else {
+      filesWrap.classList.add("hidden");
+    }
+
+    focusedEl.textContent = rec.improvedPrompt || "";
+    latestImproved = rec.improvedPrompt || "";
     latestStats = {
-      promptTokens: result.promptTokens,
-      projectedTokens: result.projectedTokens,
-      savedTokens: result.savedTokens,
-      savedPct: result.savedPct,
-      rating: result.rating,
+      savedTokens: s.savedTokens || 0,
+      savedPct: s.savedPct || 0,
+      rating: a.rating,
     };
   }
 
   function clearResult() {
     resultEl.classList.add("hidden");
-    latestFocusedPrompt = "";
+    latestImproved = "";
     latestStats = null;
+  }
+
+  async function run(prompt) {
+    const rec = await window.metriq.recommendPrompt(prompt);
+    renderResult(rec);
   }
 
   input.addEventListener("input", () => {
@@ -54,24 +94,33 @@
       clearResult();
       return;
     }
-    debounceTimer = setTimeout(async () => {
-      const result = await window.metriq.analyzePrompt(prompt);
-      renderResult(result);
-    }, 350);
+    debounceTimer = setTimeout(() => run(prompt), 350);
+  });
+
+  // Approve -> apply (clipboard today; the cross-app write-back is the gated seam).
+  btnApply.addEventListener("click", async () => {
+    if (!latestImproved) return;
+    await window.metriq.applyPrompt(latestImproved, latestStats);
+    btnApply.textContent = "Applied — paste with ⌘/Ctrl+V";
+    setTimeout(() => window.metriq.closeCapture(), 900);
   });
 
   btnCopy.addEventListener("click", async () => {
-    if (!latestFocusedPrompt) return;
-    await window.metriq.copyToClipboard(latestFocusedPrompt, latestStats);
+    if (!latestImproved) return;
+    await window.metriq.copyToClipboard(latestImproved, latestStats);
     btnCopy.textContent = "Copied!";
-    setTimeout(() => {
-      btnCopy.textContent = "Copy improved prompt";
-    }, 1200);
+    setTimeout(() => (btnCopy.textContent = "Copy"), 1200);
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") window.metriq.closeCapture();
   });
 
+  // If the background watcher seeded a prompt, prefill and analyze immediately.
+  const seeded = await window.metriq.getSeededPrompt();
+  if (seeded) {
+    input.value = seeded;
+    run(seeded.trim());
+  }
   input.focus();
 })();

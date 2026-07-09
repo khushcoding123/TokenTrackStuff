@@ -207,6 +207,32 @@
               </div>
             </div>
 
+            <div class="settings-list">
+              <div class="settings-row">
+                <span class="settings-row-label">Auto-capture (background)</span>
+                <button id="btn-autocapture" class="theme-toggle-btn" role="switch" aria-checked="false">
+                  <span id="autocapture-label">Off</span>
+                </button>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Permission</span>
+                <span id="autocapture-permission" class="settings-row-value muted">—</span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">GitHub repo</span>
+                <input id="capture-repo-input" class="settings-name-input" type="text" placeholder="github.com/owner/repo" autocomplete="off" />
+              </div>
+              <div class="settings-row">
+                <span id="capture-repo-status" class="muted">Files from this repo sharpen suggestions.</span>
+                <button id="btn-save-repo" class="theme-toggle-btn">Save</button>
+              </div>
+            </div>
+            <p class="muted settings-account-note">
+              Off by default. Auto-capture watches the prompt you're drafting in your AI tool and
+              suggests a focused rewrite — reading the focused text field via OS accessibility, not
+              screen recording. A window appears when a suggestion is ready.
+            </p>
+
             <button id="btn-logout" class="btn btn-danger-outline">Log out</button>
           </section>
         </div>

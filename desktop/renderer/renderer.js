@@ -389,6 +389,65 @@
     settingsHotkeyLabel.textContent = formatted;
   });
 
+  // --- Auto-capture (background prompt watching) --------------------------
+
+  const btnAutoCapture = document.getElementById("btn-autocapture");
+  const autoCaptureLabel = document.getElementById("autocapture-label");
+  const autoCapturePermission = document.getElementById("autocapture-permission");
+  const captureRepoInput = document.getElementById("capture-repo-input");
+  const captureRepoStatus = document.getElementById("capture-repo-status");
+  const btnSaveRepo = document.getElementById("btn-save-repo");
+
+  function renderAutoCapture(state) {
+    const on = Boolean(state.enabled);
+    autoCaptureLabel.textContent = on ? "On" : "Off";
+    btnAutoCapture.setAttribute("aria-checked", String(on));
+    const access = state.permission?.accessibility;
+    autoCapturePermission.textContent =
+      access === "granted"
+        ? "Accessibility granted"
+        : access === "not-required"
+          ? "Not required on this OS"
+          : access === "denied"
+            ? "Accessibility needed — click to grant"
+            : access || "unknown";
+  }
+
+  async function initAutoCapture() {
+    if (!btnAutoCapture) return;
+    renderAutoCapture(await window.metriq.getAutoCapture());
+    captureRepoInput.value = await window.metriq.getCaptureRepoUrl();
+
+    btnAutoCapture.addEventListener("click", async () => {
+      const current = btnAutoCapture.getAttribute("aria-checked") === "true";
+      const result = await window.metriq.setAutoCapture(!current);
+      if (result.ok) {
+        renderAutoCapture(await window.metriq.getAutoCapture());
+      } else {
+        // Permission denied on enable — reflect it and open OS Settings so the
+        // user can grant Accessibility, then toggle again.
+        renderAutoCapture({ enabled: false, permission: result.permission });
+        await window.metriq.openPermissionSettings("accessibility");
+      }
+    });
+
+    autoCapturePermission.addEventListener("click", () =>
+      window.metriq.openPermissionSettings("accessibility")
+    );
+
+    btnSaveRepo.addEventListener("click", async () => {
+      const url = captureRepoInput.value.trim();
+      await window.metriq.setCaptureRepoUrl(url);
+      btnSaveRepo.textContent = "Saved";
+      captureRepoStatus.textContent = url
+        ? "Suggestions will name files from this repo."
+        : "No repo — suggestions add scope guards only.";
+      setTimeout(() => (btnSaveRepo.textContent = "Save"), 1200);
+    });
+  }
+
+  initAutoCapture();
+
   btnLinkProject.addEventListener("click", async () => {
     const folderPath = await window.metriq.pickFolder();
     if (!folderPath) return;
