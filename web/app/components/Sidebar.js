@@ -1,5 +1,6 @@
 const NAV_ITEMS = [
   { key: "usage", label: "Dashboard", href: "/usage", icon: "space_dashboard" },
+  { key: "optimize", label: "Optimize", href: "/optimize", icon: "auto_fix_high" },
   { key: "prompt-studio", label: "Prompt Studio", href: "/prompt-studio", icon: "bolt" },
   { key: "sessions", label: "Sessions", href: "/sessions", icon: "history" },
   { key: "sustainability", label: "Sustainability", href: "/sustainability", icon: "eco" },

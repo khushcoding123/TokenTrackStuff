@@ -1,0 +1,8 @@
+{
+  "name": "@metriq/optimize",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub-aware prompt optimization: connect a repo, find task-relevant files, and generate a focused, token-cheap prompt. Shared by the web /optimize page and the desktop capture flow. Reuses @metriq/core for analysis and rewriting. Network-allowed (GitHub API) — unlike @metriq/core, which stays offline.",
+  "license": "MIT"
+}
