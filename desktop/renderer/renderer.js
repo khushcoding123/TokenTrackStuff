@@ -304,7 +304,7 @@
       className: "high-contrast",
       icon: "contrast",
       label: "High contrast",
-      description: "A dedicated high-contrast palette — stronger separation between text, surfaces, borders, and controls.",
+      description: "A dedicated high-contrast palette — stronger separation between text, surfaces, borders, and controls. Defaults to your system setting until you choose explicitly.",
     },
     {
       id: "reduceMotion",
@@ -338,13 +338,19 @@
 
   async function initAccessibility() {
     const saved = (await window.metriq.getAccessibility()) || {};
-    const prefersReducedMotionOS =
-      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const canMatchMedia = typeof window.matchMedia === "function";
+    // Same OS-default pattern for both: respected only when the user has
+    // never explicitly touched the toggle in-app (see theme-init.js, which
+    // applies this identical logic before first paint).
+    const osDefaults = {
+      highContrast: canMatchMedia && window.matchMedia("(prefers-contrast: more)").matches,
+      reduceMotion: canMatchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    };
 
     accessibilityList.innerHTML = "";
     for (const opt of ACCESSIBILITY_OPTIONS) {
       const explicit = saved[opt.id];
-      const isOn = explicit === true || (opt.id === "reduceMotion" && explicit === undefined && prefersReducedMotionOS);
+      const isOn = explicit === true || (explicit === undefined && Boolean(osDefaults[opt.id]));
 
       const row = document.createElement("label");
       row.className = "tool-row a11y-row" + (isOn ? " is-checked" : "");
