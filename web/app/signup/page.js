@@ -7,7 +7,7 @@ export const metadata = { title: "Sign up" };
 
 export default async function SignupPage({ searchParams }) {
   const session = await getSession();
-  if (session) redirect("/account");
+  if (session) redirect("/");
 
   const params = await searchParams;
   const isDesktop = params?.desktop === "1";

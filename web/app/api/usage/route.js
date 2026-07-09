@@ -10,6 +10,7 @@ import { getClaudeDirs, loadClaudeRecords } from "../../../../src/core/usage/cla
 import { getCodexSessionsDir, loadCodexUsage } from "../../../../src/core/usage/codex.js";
 import { aggregate } from "../../../../src/core/usage/aggregate.js";
 import { generateInsights } from "../../../../src/core/usage/insights.js";
+import { analyzeCurrentSession } from "../../../../src/core/usage/behavior.js";
 
 // Reading logs is a per-request filesystem scan; never pre-render.
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ function buildPayload(days) {
     generatedAt: new Date().toISOString(),
     rateLimits,
     insights: generateInsights(agg, rateLimits),
+    currentSession: analyzeCurrentSession(records, { rateLimits }),
     ...agg,
   };
 }

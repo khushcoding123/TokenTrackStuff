@@ -21,7 +21,10 @@
     "appId": "app.metriq.desktop",
     "productName": "Metriq",
     "files": ["src/**/*", "renderer/**/*", "package.json"],
-    "extraResources": [{ "from": "../packages/core", "to": "packages/core" }],
+    "extraResources": [
+      { "from": "../packages/core", "to": "packages/core" },
+      { "from": "../src/core/usage", "to": "src/core/usage" }
+    ],
     "protocols": {
       "name": "Metriq Auth Callback",
       "schemes": ["metriq"]

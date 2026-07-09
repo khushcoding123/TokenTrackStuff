@@ -1,3 +1,11 @@
+import { redirect } from "next/navigation";
+import { getSession } from "./lib/session";
+import { getClaudeDirs } from "../../src/core/usage/claude.js";
+import { getCodexSessionsDir } from "../../src/core/usage/codex.js";
+
+// The auto-open check below reads cookies + the local filesystem per request.
+export const dynamic = "force-dynamic";
+
 const RELEASES_URL = "https://github.com/khushcoding123/TokenTrackStuff/releases";
 
 const STEPS = [
@@ -18,15 +26,30 @@ const STEPS = [
   },
 ];
 
-const DOWNLOADS = [
-  { os: "macOS", icon: "laptop_mac", note: "Apple Silicon & Intel" },
-  { os: "Windows", icon: "desktop_windows", note: "Windows 10+" },
-  { os: "Linux", icon: "dns", note: ".AppImage / .deb" },
-];
-
 export const metadata = { title: "Metriq — Focus your prompts before you send them" };
 
-export default function LandingPage() {
+export default async function LandingPage({ searchParams }) {
+  // Opening the app should land you straight on the dashboard: anyone who is
+  // signed in, or running this locally where agent logs exist, is a user of
+  // the product — not a visitor who needs the marketing pitch. ?landing=1
+  // (the sidebar's "Landing page" link) always shows this page.
+  if (searchParams?.landing !== "1") {
+    let isUser = false;
+    try {
+      isUser = Boolean(await getSession());
+    } catch {
+      /* auth backend unreachable — fall through to the local-logs check */
+    }
+    if (!isUser) {
+      try {
+        isUser = getClaudeDirs().length > 0 || Boolean(getCodexSessionsDir());
+      } catch {
+        /* filesystem unavailable (deployed edge) — show the landing page */
+      }
+    }
+    if (isUser) redirect("/usage");
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-mesh relative overflow-hidden">
       <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
@@ -41,20 +64,10 @@ export default function LandingPage() {
         </div>
         <nav className="flex items-center gap-2 md:gap-4">
           <a
-            className="hidden sm:inline-block px-4 py-2 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors"
-            href="/prompt-studio"
-          >
-            Live demo
-          </a>
-          <a
-            className="hidden sm:inline-block px-4 py-2 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors"
-            href="/login"
-          >
-            Log in
-          </a>
-          <a
             className="bg-primary/10 border border-primary text-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/20 transition-all duration-300"
-            href="#download"
+            href={RELEASES_URL}
+            rel="noreferrer noopener"
+            target="_blank"
           >
             Download
           </a>
@@ -72,30 +85,35 @@ export default function LandingPage() {
           </h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
             Metriq analyzes your prompt against your real codebase before it ever reaches Claude, ChatGPT, Cursor,
-            or VS Code — flagging what's too broad and rewriting it into something focused, so your AI tool
+            or VS Code, flagging what's too broad and rewriting it into something focused, so your AI tool
             doesn't waste tokens searching the whole project.
           </p>
-          <div className="flex flex-col sm:flex-row items-center gap-4 mt-2">
+          <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
             <a
               className="bg-primary text-on-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:opacity-90 transition-all duration-300 flex items-center gap-2"
-              href="#download"
+              href={RELEASES_URL}
+              rel="noreferrer noopener"
+              target="_blank"
             >
               <span className="material-symbols-outlined text-[18px]">download</span>
               Download for macOS
             </a>
-            <a
-              className="bg-primary/10 border border-primary text-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:bg-primary/20 transition-all duration-300 flex items-center gap-2 group"
-              href="/prompt-studio"
-            >
-              <span className="material-symbols-outlined text-[18px] group-hover:scale-110 transition-transform">
-                bolt
-              </span>
-              Try the live demo
-            </a>
+            {[
+              { os: "Windows", icon: "desktop_windows" },
+              { os: "Linux", icon: "dns" },
+            ].map((d) => (
+              <a
+                key={d.os}
+                className="bg-primary/10 border border-primary text-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:bg-primary/20 transition-all duration-300 flex items-center gap-2"
+                href={RELEASES_URL}
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                <span className="material-symbols-outlined text-[18px]">{d.icon}</span>
+                Download for {d.os}
+              </a>
+            ))}
           </div>
-          <span className="font-label-sm text-label-sm text-on-surface-variant/70">
-            Also available for Windows and Linux
-          </span>
         </section>
 
         {/* Before / after */}
@@ -148,40 +166,6 @@ export default function LandingPage() {
             ))}
           </div>
         </section>
-
-        {/* Download */}
-        <section className="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop pb-24 md:pb-32" id="download">
-          <div className="glass-card p-8 md:p-12 flex flex-col items-center text-center gap-stack-lg">
-            <h2 className="font-headline-lg text-headline-lg text-on-background">Get Metriq</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant max-w-xl">
-              The desktop app is in early access — grab the latest build for your platform from GitHub Releases.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
-              {DOWNLOADS.map((d) => (
-                <a
-                  key={d.os}
-                  className="bg-surface-glass border border-border-subtle rounded-lg px-4 py-5 flex flex-col items-center gap-2 hover:border-primary/50 transition-colors"
-                  href={RELEASES_URL}
-                  rel="noreferrer noopener"
-                  target="_blank"
-                >
-                  <span className="material-symbols-outlined text-[28px] text-primary">{d.icon}</span>
-                  <span className="font-label-md text-label-md text-on-surface">{d.os}</span>
-                  <span className="font-label-sm text-label-sm text-on-surface-variant/70">{d.note}</span>
-                </a>
-              ))}
-            </div>
-
-            <div className="border-t border-border-subtle w-full max-w-xl pt-stack-lg mt-2 flex flex-col items-center gap-2">
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Prefer the terminal? The CLI still works, no download required.
-              </span>
-              <code className="font-label-md text-label-md text-primary bg-terminal-black rounded-lg px-4 py-2 border border-border-subtle">
-                npx metriq analyze &quot;your prompt here&quot;
-              </code>
-            </div>
-          </div>
-        </section>
       </main>
 
       <footer className="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border-subtle/50 relative z-10">
@@ -202,12 +186,6 @@ export default function LandingPage() {
             target="_blank"
           >
             GitHub
-          </a>
-          <a
-            className="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors"
-            href="/prompt-studio"
-          >
-            Live demo
           </a>
         </div>
       </footer>

@@ -103,25 +103,8 @@
   font-size: 12px;
 }
 
-.capture-badge {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(75, 226, 119, 0.15);
-  color: var(--primary);
-}
-
-.capture-badge.rating-broad {
-  background: rgba(255, 180, 171, 0.15);
-  color: var(--error);
-}
-
-.capture-badge.rating-moderate {
-  background: rgba(255, 186, 97, 0.15);
-  color: #ffba61;
-}
+/* .capture-badge and its rating-* variants moved to the shared styles.css —
+   Prompt Studio (index.html) uses the same rating badge. */
 
 .capture-issues {
   list-style: none;

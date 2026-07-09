@@ -39,6 +39,25 @@ function projectLabel(dirName) {
   return parts.length ? parts[parts.length - 1] : dirName;
 }
 
+// Pull the human-typed text out of a user message's content, which is either
+// a plain string or an array of typed blocks. Tool results, command output
+// and slash-command noise are not prompts, so they return "".
+function extractUserText(content) {
+  let text = "";
+  if (typeof content === "string") {
+    text = content;
+  } else if (Array.isArray(content)) {
+    text = content
+      .filter((block) => block && block.type === "text" && typeof block.text === "string")
+      .map((block) => block.text)
+      .join("\n");
+  }
+  text = text.trim();
+  // Skip system-generated user entries: interrupts, command wrappers, etc.
+  if (!text || text.startsWith("<") || text.startsWith("Caveat:")) return "";
+  return text;
+}
+
 /**
  * Parse one session JSONL file into normalized usage records.
  * @param {string} filePath absolute path to <sessionId>.jsonl
@@ -55,6 +74,11 @@ function parseSessionFile(filePath, project, seen) {
     return records; // unreadable file: skip, never throw
   }
 
+  // The user prompt that started the turn currently being parsed; every
+  // assistant record that follows is attributed to it (for the intent /
+  // waste breakdowns on the dashboard).
+  let currentPrompt = null;
+
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     let entry;
@@ -65,6 +89,15 @@ function parseSessionFile(filePath, project, seen) {
     }
 
     const message = entry.message;
+
+    // Real user prompts start a new turn. Skip meta entries and tool
+    // results (arrays whose blocks are tool_result, not typed text).
+    if (entry.type === "user" && message && message.role === "user" && !entry.isMeta) {
+      const text_ = extractUserText(message.content);
+      if (text_) currentPrompt = text_.slice(0, 500);
+      continue;
+    }
+
     const usage = message && message.usage;
     if (!usage || !entry.timestamp) continue;
 
@@ -94,6 +127,7 @@ function parseSessionFile(filePath, project, seen) {
       outputTokens: output,
       cacheCreationTokens: cacheCreate,
       cacheReadTokens: cacheRead,
+      prompt: currentPrompt,
     });
   }
   return records;

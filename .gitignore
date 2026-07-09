@@ -17,6 +17,7 @@ examples/demo-app/
 # `npm run package:mac`, never committed. Contains 100MB+ framework
 # binaries that exceed GitHub's file size limit.
 desktop/dist/
+desktop/*.app/
 
 # InsForge & AI agent skills
 .insforge

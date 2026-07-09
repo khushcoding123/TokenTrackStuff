@@ -14,13 +14,11 @@ const INSFORGE_BASE_URL = process.env.METRIQ_INSFORGE_URL || "https://v36dqchj.u
 const TABLE = "linked_projects";
 
 async function request(method, pathAndQuery, { token, body, extraHeaders } = {}) {
+  const headers = { "Content-Type": "application/json", ...(extraHeaders || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${INSFORGE_BASE_URL}${pathAndQuery}`, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(extraHeaders || {}),
-    },
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
@@ -79,10 +77,22 @@ async function updateProfile(token, profile) {
   });
 }
 
+// The desktop app holds a bearer token (not the cookie session the web app's
+// @insforge/sdk middleware auto-refreshes), so it has to exchange the stored
+// refresh token itself once the access token expires. Mirrors the SDK's own
+// bearer-token refresh path: POST /api/auth/refresh?client_type=mobile with
+// { refreshToken } in the body, no Authorization header needed.
+function refreshSession(refreshToken) {
+  return request("POST", "/api/auth/refresh?client_type=mobile", {
+    body: { refreshToken },
+  });
+}
+
 module.exports = {
   listLinkedProjects,
   createLinkedProject,
   updateLinkedProject,
   deleteLinkedProject,
   updateProfile,
+  refreshSession,
 };

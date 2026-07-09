@@ -30,6 +30,24 @@ const SEGMENTS = [
   { key: "outputTokens", label: "Output", barClass: "bg-tertiary/80", dotClass: "bg-tertiary" },
 ];
 
+// Intent pie-slice colors (theme vars where they exist, fixed accents where
+// the palette has no matching role).
+const INTENT_COLORS = {
+  bugfix: "rgb(var(--color-error))",
+  feature: "rgb(var(--color-primary))",
+  refactor: "rgb(var(--color-secondary))",
+  testing: "rgb(var(--color-tertiary))",
+  question: "#6b8afd",
+  other: "#8a93a6",
+};
+
+const WASTE_ICONS = {
+  rework: "replay",
+  retries: "repeat",
+  uncachedContext: "database_off",
+  vagueExploration: "explore",
+};
+
 const PAGE_SIZE = 6;
 
 function fmtTokens(n) {
@@ -80,6 +98,191 @@ function ProgressBar({ pct, toneClass = "bg-primary" }) {
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
       />
     </div>
+  );
+}
+
+// "This session" panel: an intent pie chart (what the tokens bought) and a
+// wasted-tokens breakdown (which tokens bought nothing). Data comes from
+// payload.currentSession, computed by src/core/usage/behavior.js.
+function CurrentSessionCharts({ session }) {
+  const [hoveredIntent, setHoveredIntent] = useState(null);
+
+  const intents = session.intents || [];
+  const waste = session.waste || [];
+  const bugfix = intents.find((i) => i.key === "bugfix") || null;
+  const hasLimit = session.sessionUsedPctOfLimit != null;
+
+  // Build the conic-gradient stops for the pie.
+  let acc = 0;
+  const stops = intents.map((i) => {
+    const from = acc;
+    acc += i.pctOfSession;
+    return `${INTENT_COLORS[i.key] || INTENT_COLORS.other} ${from}% ${acc}%`;
+  });
+
+  const wasteMax = Math.max(1, ...waste.map((w) => w.tokens));
+  const productiveTokens = Math.max(0, session.sessionTokens - session.wastedTokens);
+
+  return (
+    <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+      {/* Intent pie chart */}
+      <div className="lg:col-span-5 glass-card p-6 flex flex-col gap-stack-md">
+        <div>
+          <h3 className="font-headline-md text-headline-md text-on-background flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-primary">donut_small</span>
+            This session — where your tokens went
+          </h3>
+          <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
+            {session.project} · {SOURCE_META[session.source]?.label || session.source} ·{" "}
+            {session.turns} turns since {fmtWhen(session.startedAt)}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-6 flex-wrap">
+          <div
+            className="relative w-40 h-40 rounded-full shrink-0"
+            style={{
+              background: stops.length
+                ? `conic-gradient(${stops.join(", ")})`
+                : "rgb(var(--color-surface-container-highest))",
+            }}
+          >
+            <div className="absolute inset-[26px] rounded-full bg-surface-container-low flex flex-col items-center justify-center text-center">
+              {bugfix ? (
+                <>
+                  <span className="font-headline-md text-headline-md text-error leading-none">
+                    {hasLimit ? `${bugfix.pctOfLimit}%` : `${bugfix.pctOfSession}%`}
+                  </span>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant px-3 leading-tight mt-1">
+                    {hasLimit ? "of session limit on bug fixes" : "of tokens on bug fixes"}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="font-headline-md text-headline-md text-primary leading-none">0%</span>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant px-3 leading-tight mt-1">
+                    spent fixing bugs
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-[220px] space-y-2">
+            {intents.map((i) => (
+              <div
+                key={i.key}
+                className={`flex items-center gap-3 rounded-lg px-2 py-1.5 -mx-2 transition-colors cursor-default ${
+                  hoveredIntent === i.key ? "bg-surface-container-high/50" : ""
+                }`}
+                onMouseEnter={() => setHoveredIntent(i.key)}
+                onMouseLeave={() => setHoveredIntent(null)}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ background: INTENT_COLORS[i.key] || INTENT_COLORS.other }}
+                />
+                <span className="font-label-md text-label-md text-on-surface flex-1 truncate">
+                  {i.label}
+                </span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant shrink-0">
+                  {i.turns} {i.turns === 1 ? "turn" : "turns"} · {fmtTokens(i.tokens)}
+                </span>
+                <span className="font-label-md text-label-md text-on-surface w-14 text-right shrink-0">
+                  {i.pctOfSession}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="font-label-sm text-label-sm text-on-surface-variant">
+          {hasLimit
+            ? `This session has used ${session.sessionUsedPctOfLimit}% of your 5-hour session limit; each slice shows the share of tokens (and of that limit) each kind of work consumed.`
+            : "Each turn's prompt is classified locally (bug fix, feature, refactor…) and the tokens the agent burned on that turn are attributed to it."}
+        </p>
+      </div>
+
+      {/* Wasted tokens */}
+      <div className="lg:col-span-7 glass-card p-6 flex flex-col gap-stack-md">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="font-headline-md text-headline-md text-on-background flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-error">delete_sweep</span>
+              Wasted tokens this session
+            </h3>
+            <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
+              Tokens that bought no forward progress — rework, retries, and re-sent context.
+            </p>
+          </div>
+          <div className="text-right">
+            <span className={`font-headline-lg text-headline-lg ${session.wastedPct >= 20 ? "text-error" : "text-on-background"}`}>
+              {fmtTokens(session.wastedTokens)}
+            </span>
+            <p className="font-label-sm text-label-sm text-on-surface-variant">
+              {session.wastedPct}% of session tokens
+            </p>
+          </div>
+        </div>
+
+        {/* Productive vs wasted split */}
+        <div className="space-y-1.5">
+          <div className="h-3 w-full rounded-full overflow-hidden flex bg-surface-container-highest">
+            <div
+              className="h-full bg-primary/70"
+              style={{ width: `${(productiveTokens / session.sessionTokens) * 100}%` }}
+            />
+            <div
+              className="h-full bg-error/80"
+              style={{ width: `${(session.wastedTokens / session.sessionTokens) * 100}%` }}
+            />
+          </div>
+          <div className="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-primary/70" /> Productive · {fmtTokens(productiveTokens)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-error/80" /> Wasted · {fmtTokens(session.wastedTokens)}
+            </span>
+          </div>
+        </div>
+
+        {waste.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center py-8">
+            <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">check_circle</span>
+              No wasted tokens detected in this session — nice and focused.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4 flex-1">
+            {waste.map((w) => (
+              <div key={w.key} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-label-md text-label-md text-on-surface flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-[16px] text-on-surface-variant shrink-0">
+                      {WASTE_ICONS[w.key] || "warning"}
+                    </span>
+                    <span className="truncate">{w.label}</span>
+                  </span>
+                  <span className="font-label-md text-label-md text-on-surface shrink-0">
+                    {fmtTokens(w.tokens)}
+                    <span className="text-on-surface-variant"> · {w.turns} {w.turns === 1 ? "turn" : "turns"}</span>
+                  </span>
+                </div>
+                <ProgressBar pct={(w.tokens / wasteMax) * 100} toneClass="bg-error/70" />
+                <p className="font-label-sm text-label-sm text-on-surface-variant">{w.hint}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="font-label-sm text-label-sm text-on-surface-variant border-l-2 border-primary/50 pl-3">
+          Cut waste by scoping prompts to specific files and avoiding rapid-fire corrections —
+          run drafts through <a className="text-primary hover:underline" href="/prompt-studio">Prompt Studio</a> first.
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -483,6 +686,11 @@ export default function UsageClient() {
           )}
         </div>
       </section>
+
+      {/* Current session: intent pie + wasted tokens */}
+      {payload.currentSession && (
+        <CurrentSessionCharts session={payload.currentSession} />
+      )}
 
       {/* Insights */}
       <section className="space-y-stack-md">

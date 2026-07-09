@@ -6,6 +6,16 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Read once, synchronously, before the page's own scripts run (preload
+// always finishes before that) — index.html's blocking <head> script uses
+// this to set the theme/accessibility classes on <html> before first
+// paint, so the app never flashes the default theme/contrast/motion on
+// launch. Deliberately a plain object, not a live binding: it's a one-time
+// snapshot for pre-paint use, not a subscription (renderer.js re-reads
+// current values via the async metriq.getAccessibility()/getTheme() below
+// for anything that needs to react to later changes).
+contextBridge.exposeInMainWorld("metriqInitial", ipcRenderer.sendSync("prefs:get-initial-sync"));
+
 contextBridge.exposeInMainWorld("metriq", {
   getCaptureHotkey: () => ipcRenderer.invoke("app:get-capture-hotkey"),
 
@@ -41,6 +51,9 @@ contextBridge.exposeInMainWorld("metriq", {
   getTheme: () => ipcRenderer.invoke("prefs:get-theme"),
   setTheme: (theme) => ipcRenderer.invoke("prefs:set-theme", theme),
 
+  getAccessibility: () => ipcRenderer.invoke("prefs:get-accessibility"),
+  setAccessibility: (patch) => ipcRenderer.invoke("prefs:set-accessibility", patch),
+
   openCapture: () => ipcRenderer.invoke("capture:open"),
   closeCapture: () => ipcRenderer.invoke("capture:close"),
   getCaptureContext: () => ipcRenderer.invoke("capture:get-context"),
@@ -67,4 +80,6 @@ contextBridge.exposeInMainWorld("metriq", {
   setCaptureRepoUrl: (url) => ipcRenderer.invoke("settings:set-repo-url", url),
 
   getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
+
+  getUsage: (days) => ipcRenderer.invoke("usage:get", days),
 });

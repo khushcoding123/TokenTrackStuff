@@ -12,20 +12,27 @@ too broad, estimates its token cost, and rewrites vague prompts into focused
 ones that keep the AI on the right files instead of searching the whole
 codebase.
 
-**Product direction (as of the current pivot):** metriq is moving from
-"terminal-first CLI" to a **desktop app** (Electron) as the primary product,
-with the web app repositioned as a marketing site + no-download live demo,
-and the CLI kept alive as a secondary interface. See "Product phases" below
-for what's actually built vs. planned.
+**Product direction (post-pivot, current state):** the **desktop app**
+(Electron) is now the whole product — prompt checking, project linking,
+token/usage tracking, and account settings all live there. The **web app**
+has been reduced to a marketing landing page plus the auth-handoff
+infrastructure the desktop app needs (login/signup/OAuth-callback pages a
+user is never expected to browse to directly — the app opens them in the
+system browser and gets redirected straight back). Every other web route
+that used to exist (`/prompt-studio`, `/sessions`, `/sustainability`,
+`/settings`, `/account`, `/usage`) has been deleted — each was either mock
+data, or fully superseded by a real-data equivalent already built in the
+desktop app. The CLI remains a secondary interface. See "Product phases"
+below for what's actually built vs. planned.
 
 This repo contains three deliverables:
 
 | Path | What it is |
 | --- | --- |
-| `packages/core/` | The **shared engine** (analyze → scan → rewrite) — zero runtime deps, used by the CLI, the web demo, and (soon) the desktop app |
-| `bin/`, `src/` | The **CLI** — published to npm as `metriq`; now a secondary interface, not the focus |
-| `web/` | The **web app** — Next.js 14, deployed to Vercel. Marketing landing page + live `/prompt-studio` demo + auth (shared with the future desktop app) |
-| `desktop/` | The **desktop app** (Electron) — window/tray/auth, repo linking, and the prompt-capture window are built; see "Product phases" |
+| `packages/core/` | The **shared engine** (analyze → scan → rewrite) — zero runtime deps, used by the CLI and the desktop app |
+| `bin/`, `src/` | The **CLI** — published to npm as `metriq`; secondary interface |
+| `web/` | The **web app** — Next.js 14, deployed to Vercel. Just the marketing landing page (`/`) plus auth-handoff infrastructure (`/login`, `/signup`, `/desktop-connected`, `/api/auth/*`) the desktop app depends on. No visible dashboard pages anymore |
+| `desktop/` | The **desktop app** (Electron) — the actual product: Overview, Prompt Studio, Projects, Tools, Usage, Impact, Settings (with a full accessibility system) |
 
 ## Live locations
 
@@ -53,14 +60,13 @@ next starts. Status:
   `src/core/` — it's CLI-specific persistence, not part of the reusable
   engine.
 - ✅ **Phase 1 (web):** `/` is now a marketing landing page (hero, before/after
-  prompt example, "how it works", download CTAs for macOS/Windows/Linux
-  pointing at GitHub Releases — placeholder until real builds exist). CLI is
-  mentioned as a secondary option (`npx metriq analyze "..."`).
-  `/prompt-studio` is unchanged and is the live, no-download demo of the real
-  engine. `/login`, `/signup`, `/account` (InsForge-backed auth) are
-  unchanged — the desktop app will reuse this exact auth flow. `/sessions`
-  and `/sustainability` still work but are deprioritized (mock data, no
-  further design investment for now).
+  prompt example, "how it works", download CTAs for macOS/Windows/Linux —
+  now full buttons of equal weight, all pointing at GitHub Releases,
+  placeholder until real builds exist). CLI is mentioned as a secondary
+  option (`npx metriq analyze "..."`). No "Live demo"/"Log in" links on the
+  landing page anymore — see the later "web scope reduction" phase below.
+  `/login`, `/signup` (InsForge-backed auth) are unchanged — the desktop app
+  reuses this exact auth flow.
 - ✅ **Phase 2 (desktop shell + auth):** Electron app at `desktop/` — window,
   tray icon, app menu, `metriq://` protocol registration. Login opens the web
   `/login?desktop=1` (or `/signup?desktop=1`); on success the web app lands
@@ -86,7 +92,8 @@ next starts. Status:
   (or the in-app button) opens a small always-on-top capture window
   (`desktop/renderer/capture.*`) that runs `optimize()` +
   `findRelevantFiles()` from `packages/core` against the active project's
-  real path — same engine, same output as the CLI/`/prompt-studio` — on a
+  real path — same engine and output as the CLI and the in-app Prompt
+  Studio page (see below) — on a
   debounced keystroke, with one-click copy to clipboard. No screen/window
   reading of other apps.
 - 📄 **Phase 5 (proposal only, not approved):** see
@@ -95,15 +102,56 @@ next starts. Status:
   extension), VS Code/Cursor only, prototyped via `osascript` shell-out
   before any native code. **Do not implement anything from that document
   without explicit approval of its scope first.**
+- ✅ **Usage/insights tracking:** `src/core/usage/` (aggregate, claude, codex,
+  pricing, insights) reads local Claude Code + Codex session logs and
+  prices/aggregates them — shared by `metriq trace` (CLI) and the desktop
+  app's Usage tab. Deterministic insight heuristics (low cache hit rate,
+  input≫output ratio, expensive outlier sessions, etc.), same
+  same-input-same-output determinism guarantee as the prompt analyzer.
+- ✅ **Desktop visual redesign:** see `desktop/DESIGN.md` — full design-token
+  system (layered dark surfaces, JetBrains Mono for every number, tightened
+  radius/motion scale), left icon-rail sidebar replacing the old bottom tab
+  bar, and a from-scratch Settings/Projects/Tools/Impact pass. Light/dark
+  theme toggle was briefly retired then explicitly restored at request —
+  don't re-remove it without checking history first.
+- ✅ **Accessibility system:** Settings → Accessibility — High Contrast (own
+  palette, not an inversion; respects `prefers-contrast: more` by default),
+  Reduce Motion (respects `prefers-reduced-motion` by default), Dyslexia-
+  friendly font (bundled OpenDyslexic, `desktop/renderer/assets/fonts/`,
+  since the CSP blocks loading it remotely), and Colorblind-friendly mode
+  (Okabe–Ito-derived semantic palette). All four are token-layer overrides
+  on `<html>` (`.high-contrast`/`.reduce-motion`/`.dyslexia-font`/
+  `.colorblind` classes), applied pre-paint by `desktop/renderer/theme-
+  init.js` (a blocking external script — the CSP has no `'unsafe-inline'`
+  for script-src) to avoid a flash of the wrong theme on launch. Every color
+  in `styles.css`/`capture.css` is token-driven (`color-mix()` for alpha
+  variants) specifically so these modes reach every component with no
+  per-component work — don't reintroduce a hardcoded `rgba(...)` accent
+  color without converting it.
+- ✅ **Web scope reduction:** the web app's dashboard-ish pages
+  (`/prompt-studio`, `/sessions`, `/sustainability`, `/settings`,
+  `/account`, `/usage`, and their API route `/api/usage`) have all been
+  **deleted**. Each was either mock data (`/sessions`, `/sustainability`),
+  redundant with a real desktop equivalent (`/account`, `/settings`,
+  `/usage`), or fully ported into the desktop app as a richer real-data
+  page (`/prompt-studio` → desktop's Prompt Studio tab, reusing the exact
+  same `capture:*` IPC surface as the `Cmd/Ctrl+Shift+M` capture window).
+  Post-login/signup redirects that used to target `/usage` or `/account`
+  now go to `/` (the landing page), since there's no in-browser destination
+  left. `Sidebar.js`/`TopBar.js`/`ThemeToggle.js`/`lib/csv.js` were deleted
+  as now-orphaned shared components. **The web app's only remaining job is
+  the landing page plus the auth-handoff infrastructure** (`/login`,
+  `/signup`, `/desktop-connected`, `/api/auth/*`) — don't add new
+  dashboard-style pages there; build them in the desktop app instead.
 
 ## Hard rules / conventions
 
 - **`packages/core` has ZERO runtime dependencies**, same rule that used to
   apply to the whole CLI. This is deliberate — the CLI must still run
   instantly via `npx` with no install step, and the engine must stay
-  embeddable in a browser bundle (`/prompt-studio` imports it directly) and
-  later an Electron renderer. Do not add dependencies there without a very
-  good reason.
+  embeddable directly in the Electron renderer with no bundler (the desktop
+  app's Prompt Studio page and capture window both import it by relative
+  path). Do not add dependencies there without a very good reason.
 - **The engine (`packages/core`) is offline-only.** No network calls, no API
   keys. All analysis is local heuristics. (An optional AI-powered rewrite is
   on the roadmap but not built.)
@@ -141,8 +189,7 @@ duplicate this logic elsewhere.
 - `packages/core/scanner.js` — scans a working dir for source files whose
   names/paths match prompt keywords, so rewrites can name real files. Ignores
   `node_modules`, `.git`, build dirs, etc. Returns forward-slash paths. Uses
-  `node:fs`/`node:path`, so it's CLI/Electron-only (not imported by the
-  browser-side `/prompt-studio`, which has no filesystem to scan).
+  `node:fs`/`node:path`, so it's CLI/Electron-only.
 - `packages/core/rewrite.js` — turns analysis + scanned files into a focused
   prompt: intent → starting point → scope guard → report-back. `optimize()`
   is the convenience entry that analyzes, rewrites, and computes savings.
@@ -199,48 +246,47 @@ git push origin main                    # web → Vercel auto-deploys
 
 ## Web app (`web/`)
 
+Deliberately small now — see "Web scope reduction" above. Two jobs only:
+the landing page, and auth infrastructure the desktop app depends on.
+
 - Next.js 14 App Router, plain JS (no TypeScript). Styled with real Tailwind
   CSS (build-time, via `tailwind.config.js` + `postcss.config.js` +
-  `@tailwind` directives in `globals.css`). Theme is switchable (dark
-  default, light via a curtain-wipe transition — see `ThemeProvider.js` /
-  `ThemeToggle.js`), driven by CSS custom properties in `globals.css` so
-  colors flip at runtime rather than at Tailwind build time. Glass-card
-  aesthetic, green/blue accent palette, Geist / Inter / JetBrains Mono fonts,
-  Material Symbols Outlined for icons.
+  `@tailwind` directives in `globals.css`). `ThemeProvider.js` still wraps
+  the whole app (in `layout.js`) so dark/light class-switching keeps
+  working; there's just no visible toggle UI left on any remaining page
+  (`ThemeToggle.js` was deleted along with the dashboard chrome that used
+  it). Glass-card aesthetic, green/blue accent palette, Geist / Inter /
+  JetBrains Mono fonts, Material Symbols Outlined for icons.
 - **Routes:**
   - `/` — marketing landing page (hero, before/after prompt example, "how it
-    works", download CTAs). Static, no dashboard chrome (no Sidebar/TopBar).
-  - `/prompt-studio` — **runs the real engine, not mock data.**
-    `PromptStudioClient.js` imports `analyzePrompt`/`optimize` directly from
-    `packages/core/analyzer.js` / `rewrite.js` (and pricing from
-    `packages/core/config.js`) — those modules are pure JS with no Node
-    built-ins, so they run fine in the browser. Typing in the editor live-
-    recomputes breadth score, token savings, and reasoning; the magic-wand
-    button actually calls `optimize()`; "Run Evaluation" snapshots a
-    revision history you can restore from. If you change scoring in
-    `packages/core/analyzer.js`, this page's numbers change too — same
-    source of truth as the CLI and `test/core.test.js`.
-  - `/login`, `/signup`, `/account` — auth, backed by **InsForge**
-    (`@insforge/sdk`), not a hand-rolled Prisma/JWT stack (an earlier Prisma-
-    based implementation was fully superseded — don't resurrect it). Email +
+    works", download CTAs). Static, no dashboard chrome. No "Live demo" or
+    "Log in" links — those flows live entirely in the desktop app now.
+  - `/login`, `/signup` — auth, backed by **InsForge** (`@insforge/sdk`),
+    not a hand-rolled Prisma/JWT stack (an earlier Prisma-based
+    implementation was fully superseded — don't resurrect it). Email +
     Google OAuth (PKCE, via InsForge's shared OAuth callback), session
     refreshed by `web/middleware.js`. See `AGENTS.md` for the InsForge
     project details and which InsForge skills to use for backend changes.
-    **The desktop app reuses this exact web auth flow.** `/login` and
-    `/signup` accept `?desktop=1`; when set, the login/signup API routes
-    also return a bearer `token`/`refreshToken` (normally cookie-only), and
-    a successful auth lands on `/desktop-connected` instead of `/account` —
-    that page immediately redirects to `metriq://auth-callback?token=...`
-    for the desktop app to pick up. Don't change this shape without checking
-    `desktop/src/protocol.js` and `desktop/README.md`.
-  - `/sessions`, `/sustainability` — still work, still mock data, currently
-    deprioritized (no further design investment planned right now).
-  - `/settings` — persisted prefs (pricing provider, reduced motion) via
-    `localStorage`.
-- `web/app/components/Sidebar.js` + `TopBar.js` — shared dashboard chrome
-  used by the dashboard-ish pages (`/prompt-studio`, `/sessions`,
-  `/sustainability`, `/settings`, `/account`). **Not** used by the `/`
-  landing page, which has its own minimal marketing header/footer.
+    **A user is never expected to browse to these directly** — the desktop
+    app opens them via `shell.openExternal` with `?desktop=1`, which makes
+    the login/signup API routes return a bearer `token`/`refreshToken`
+    (normally cookie-only) and land on `/desktop-connected` instead of a
+    now-deleted `/account`. Without `?desktop=1` (the rare case of someone
+    visiting directly), successful auth now redirects to `/` — there's no
+    other page left to send them to. Don't change this shape without
+    checking `desktop/src/protocol.js` and `desktop/README.md`.
+  - `/desktop-connected` — reconstructs a `metriq://auth-callback?token=...`
+    URL from its own query params and navigates to it, handing the session
+    to the desktop app. Infra only, not a page anyone browses to.
+  - `/api/auth/*` — login/signup/logout/refresh/google/callback route
+    handlers, all InsForge-backed. Infra only.
+- **Deleted** (do not resurrect without re-confirming the "web is landing +
+  auth only" decision): `/prompt-studio`, `/sessions`, `/sustainability`,
+  `/settings`, `/account`, `/usage`, `/api/usage`,
+  `components/Sidebar.js`, `components/TopBar.js`, `components/ThemeToggle.js`,
+  `lib/csv.js`. Real-data functionality from these (prompt analysis, usage
+  tracking, account settings) now lives in the desktop app instead — see
+  "Web scope reduction" in Product phases above for the reasoning per page.
 - `web/app/components/ToastProvider.js` — wraps the whole app in `layout.js`;
   `useToast()` gives any client component a `notify(message)` snackbar.
 
@@ -265,8 +311,11 @@ ESM, throughout `desktop/src/` — Electron's main process is plain Node.
   file index (`<userData>/project-cache/<id>.json`) — not secret, plain JSON
   is fine here, unlike auth-store.
 - `desktop/src/prefs.js` — small local-only prefs file (`<userData>/
-  prefs.json`): active project selection, tool preference chips. Deliberately
-  not synced via InsForge — see "Product phases" above for why.
+  prefs.json`): active project selection, tool preference chips, theme, and
+  the `accessibility` object (`highContrast`/`reduceMotion`/`dyslexiaFont`/
+  `colorblind` — each `true`/`false`/absent; absent means "no explicit
+  choice," letting the OS-default fallbacks in `theme-init.js` apply).
+  Deliberately not synced via InsForge — see "Product phases" above for why.
 - `desktop/src/insforge-client.js` — hand-rolled `fetch`-based client for
   InsForge's PostgREST-style database API (just the `linked_projects` table
   today), using the stored session's bearer token. Not `@insforge/sdk` — the
@@ -281,11 +330,18 @@ ESM, throughout `desktop/src/` — Electron's main process is plain Node.
   loosening those settings.
 - `desktop/renderer/` — plain HTML/CSS/JS, no build step, no framework.
   `index.html`/`renderer.js`/`styles.css` are the main window (login →
-  logged-in home with projects + tools + capture button);
-  `capture.html`/`capture.js`/`capture.css` are the floating prompt-capture
-  window. Deliberately not the web app's React/Tailwind stack — Phase 2-4's
-  UI needs didn't justify wiring that in; revisit if/when the desktop UI
-  grows enough to want it.
+  sidebar-nav'd home: Overview, Prompt Studio, Projects, Tools, Usage,
+  Impact, Settings); `capture.html`/`capture.js`/`capture.css` are the
+  floating prompt-capture window. Deliberately not the web app's
+  React/Tailwind stack — Phase 2-4's UI needs didn't justify wiring that
+  in; revisit if/when the desktop UI grows enough to want it. Full design
+  system (colors, type, spacing, motion, component patterns) is documented
+  in `desktop/DESIGN.md` — read it before changing visual styling.
+  `desktop/renderer/theme-init.js` is a small external script (referenced
+  from both `index.html` and `capture.html`'s `<head>`) that applies the
+  saved theme/accessibility classes to `<html>` before first paint —
+  external rather than inline because the CSP has no `'unsafe-inline'` for
+  script-src.
 - `desktop/src/main.js` imports `packages/core/scanner.js` and
   `packages/core/rewrite.js` directly by relative path (`../../packages/
   core/...`) — same "no package-name indirection" choice as the CLI, see

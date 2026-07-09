@@ -116,6 +116,51 @@ export function buildDemoPayload(days = 30) {
     };
   });
 
+  // Mirrors src/core/usage/behavior.js's analyzeCurrentSession() shape.
+  const currentSession = {
+    sessionId: "a1b2c3d4-demo",
+    source: "claude-code",
+    project: "checkout-service",
+    startedAt: new Date(now.getTime() - 3 * 3600_000).toISOString(),
+    endedAt: now.toISOString(),
+    turns: 14,
+    classifiedTurns: 14,
+    sessionTokens: 1_820_000,
+    sessionUsedPctOfLimit: 42,
+    intents: [
+      { key: "bugfix", label: "Fixing bugs", tokens: 693_000, turns: 5, pctOfSession: 38.1, pctOfLimit: 16 },
+      { key: "feature", label: "Building features", tokens: 720_000, turns: 4, pctOfSession: 39.6, pctOfLimit: 16.6 },
+      { key: "refactor", label: "Refactoring", tokens: 160_000, turns: 2, pctOfSession: 8.8, pctOfLimit: 3.7 },
+      { key: "question", label: "Questions & review", tokens: 190_000, turns: 2, pctOfSession: 10.4, pctOfLimit: 4.4 },
+      { key: "other", label: "Other", tokens: 57_000, turns: 1, pctOfSession: 3.1, pctOfLimit: 1.3 },
+    ],
+    waste: [
+      {
+        key: "rework",
+        label: "Rework after wrong output",
+        hint: "Turns spent correcting or undoing what the AI just did.",
+        tokens: 212_000,
+        turns: 2,
+      },
+      {
+        key: "uncachedContext",
+        label: "Re-sent context (cache misses)",
+        hint: "Input tokens re-sent at full price instead of read from cache.",
+        tokens: 96_000,
+        turns: 9,
+      },
+      {
+        key: "vagueExploration",
+        label: "Vague-prompt exploration",
+        hint: "Short, unscoped prompts that made the agent search the codebase.",
+        tokens: 64_000,
+        turns: 1,
+      },
+    ],
+    wastedTokens: 372_000,
+    wastedPct: 20.4,
+  };
+
   return {
     available: true,
     demo: true,
@@ -123,6 +168,7 @@ export function buildDemoPayload(days = 30) {
     days,
     generatedAt: now.toISOString(),
     rateLimits: null,
+    currentSession,
     totals,
     bySource: { "claude-code": totals },
     daily,

@@ -14,22 +14,27 @@
   const captureHotkeyLabel = document.getElementById("capture-hotkey-label");
   const settingsHotkeyLabel = document.getElementById("settings-hotkey-label");
   const toolsList = document.getElementById("tools-list");
+  const accessibilityList = document.getElementById("accessibility-list");
   const overviewActiveProject = document.getElementById("overview-active-project");
   const recentActivityList = document.getElementById("recent-activity-list");
   const recentActivityEmpty = document.getElementById("recent-activity-empty");
 
   const AVAILABLE_TOOLS = [
     { id: "claude", label: "Claude", icon: "sparkle" },
-    { id: "chatgpt", label: "ChatGPT", icon: "bubble" },
+    { id: "chatgpt", label: "ChatGPT", icon: "knot" },
     { id: "vscode", label: "VS Code", icon: "brackets" },
     { id: "cursor", label: "Cursor", icon: "cursor" },
     { id: "other", label: "Other / terminal", icon: "terminal" },
   ];
 
+  // Stylized single-color glyphs evoking each tool's mark — not literal
+  // reproductions of trademarked logos (no bundled brand assets, and the
+  // CSP blocks fetching real ones remotely), but distinct from each other
+  // and from generic chat/app iconography.
   const TOOL_ICONS = {
     sparkle:
       '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
-    bubble: '<path d="M21 11.5a8.38 8.38 0 0 1-9 8.5 8.5 8.5 0 0 1-4-1L3 20l1-4a8.4 8.4 0 0 1-1-4 8.5 8.5 0 0 1 8.5-8.5H12a8.5 8.5 0 0 1 9 7.5Z"/>',
+    knot: '<circle cx="12" cy="7.5" r="3"/><circle cx="7" cy="15.5" r="3"/><circle cx="17" cy="15.5" r="3"/>',
     brackets: '<path d="m8 4-6 8 6 8M16 4l6 8-6 8"/>',
     cursor: '<path d="m4 4 7 17 2.5-7.5L21 11 4 4Z"/>',
     terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
@@ -39,11 +44,37 @@
     return `<svg class="icon ${extraClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${pathMarkup}</svg>`;
   }
 
+  // --- Semantic alert (replaces raw error-text paragraphs) -----------------
+  // Reusable across Projects' load/link/rescan/remove errors and the
+  // Settings display-name form — one visual component, driven by a
+  // data-variant attribute, per desktop/DESIGN.md §8.
+
+  const ALERT_ICON_PATHS = {
+    error: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+    warning: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    success: '<path d="M20 7 9 18l-5-5"/>',
+  };
+
+  function setAlert(container, message, variant = "error") {
+    if (!container) return;
+    if (!message) {
+      container.classList.add("hidden");
+      container.innerHTML = "";
+      return;
+    }
+    container.dataset.variant = variant;
+    container.classList.remove("hidden");
+    container.innerHTML =
+      svgIcon(ALERT_ICON_PATHS[variant] || ALERT_ICON_PATHS.error, "alert-icon icon-sm") +
+      `<p class="alert-message"></p>`;
+    container.querySelector(".alert-message").textContent = message;
+  }
+
   // --- Theme toggle -----------------------------------------------------
-  // Adapted from the web app's ThemeProvider curtain-wipe transition: the
-  // View Transitions API is the primary path (clip-path wipe reveals the
-  // new theme top-to-bottom, old snapshot just sits still underneath); a
-  // scaling curtain div is the fallback for a Chromium build without it.
+  // The View Transitions API is the primary path (clip-path wipe reveals
+  // the new theme top-to-bottom, old snapshot just sits still underneath);
+  // a scaling curtain div is the fallback for a Chromium build without it.
 
   const SUN_PATH =
     '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
@@ -52,12 +83,16 @@
   const btnToggleTheme = document.getElementById("btn-toggle-theme");
   const themeToggleIcon = document.getElementById("theme-toggle-icon");
   const themeToggleLabel = document.getElementById("theme-toggle-label");
+  const btnToggleThemeRail = document.getElementById("btn-toggle-theme-rail");
+  const themeToggleIconRail = document.getElementById("theme-toggle-icon-rail");
 
   let curtainActive = false;
 
   function applyTheme(theme) {
     document.documentElement.classList.toggle("light", theme === "light");
-    if (themeToggleIcon) themeToggleIcon.innerHTML = theme === "light" ? SUN_PATH : MOON_PATH;
+    const iconMarkup = theme === "light" ? SUN_PATH : MOON_PATH;
+    if (themeToggleIcon) themeToggleIcon.innerHTML = iconMarkup;
+    if (themeToggleIconRail) themeToggleIconRail.innerHTML = iconMarkup;
     if (themeToggleLabel) themeToggleLabel.textContent = theme === "light" ? "Light" : "Dark";
   }
 
@@ -102,8 +137,170 @@
   }
 
   btnToggleTheme?.addEventListener("click", toggleTheme);
+  btnToggleThemeRail?.addEventListener("click", toggleTheme);
 
   window.metriq.getTheme().then((theme) => applyTheme(theme));
+
+  // --- Prompt Studio ----------------------------------------------------
+  // Reuses the exact same IPC surface as the ⌘⇧M capture window
+  // (getCaptureContext/analyzePrompt/copyToClipboard — see main.js's
+  // capture:* handlers) against the real active project, just as a full
+  // page with the complete issue list, relevant-files list, and a
+  // session-only revision history instead of the capture window's compact
+  // single-result view. Ported from the web app's /prompt-studio, which
+  // had a fake "model response" panel — this version has none, since
+  // every number here already comes from the real engine.
+
+  const psContext = document.getElementById("ps-context");
+  const psInput = document.getElementById("ps-input");
+  const psEmptyHint = document.getElementById("ps-empty-hint");
+  const psResults = document.getElementById("ps-results");
+  const psRating = document.getElementById("ps-rating");
+  const psScore = document.getElementById("ps-score");
+  const psSavings = document.getElementById("ps-savings");
+  const psIssuesBlock = document.getElementById("ps-issues-block");
+  const psIssues = document.getElementById("ps-issues");
+  const psFilesBlock = document.getElementById("ps-files-block");
+  const psFiles = document.getElementById("ps-files");
+  const psFocused = document.getElementById("ps-focused");
+  const psBtnCopy = document.getElementById("ps-btn-copy");
+  const psBtnSnapshot = document.getElementById("ps-btn-snapshot");
+  const psHistoryList = document.getElementById("ps-history-list");
+  const psHistoryEmpty = document.getElementById("ps-history-empty");
+
+  let psInitialized = false;
+  let psDebounceTimer = null;
+  let psLatestResult = null;
+  const psHistory = []; // session-only: { timestamp, prompt, result }
+
+  function psRenderResult(result) {
+    psResults.classList.remove("hidden");
+    psEmptyHint.classList.add("hidden");
+
+    psRating.textContent = result.rating;
+    psRating.className = `capture-badge rating-${result.rating}`;
+    psScore.textContent = `breadth ${result.breadthScore}/100`;
+    psSavings.textContent =
+      result.savedTokens > 0 ? `saves ~${result.savedTokens} tokens (${result.savedPct}%)` : "";
+
+    const issues = result.issues || [];
+    psIssuesBlock.classList.toggle("hidden", issues.length === 0);
+    psIssues.innerHTML = "";
+    for (const issue of issues) {
+      const li = document.createElement("li");
+      li.textContent = issue.message;
+      psIssues.append(li);
+    }
+
+    const files = result.relevantFiles || [];
+    psFilesBlock.classList.toggle("hidden", files.length === 0);
+    psFiles.innerHTML = "";
+    for (const file of files) {
+      const span = document.createElement("span");
+      span.textContent = file;
+      psFiles.append(span);
+    }
+
+    psFocused.textContent = result.focusedPrompt;
+    psLatestResult = result;
+  }
+
+  function psClearResult() {
+    psResults.classList.add("hidden");
+    psEmptyHint.classList.remove("hidden");
+    psLatestResult = null;
+  }
+
+  function psRenderHistoryRow(entry) {
+    const li = document.createElement("li");
+    li.className = "activity-item";
+    li.style.cursor = "pointer";
+
+    const left = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "activity-title";
+    title.textContent = entry.prompt.length > 60 ? entry.prompt.slice(0, 60) + "…" : entry.prompt;
+    const time = document.createElement("div");
+    time.className = "activity-time muted";
+    time.textContent = `${entry.result.rating} · ${timeAgo(entry.timestamp)}`;
+    left.append(title, time);
+
+    const right = document.createElement("div");
+    right.className = "activity-savings";
+    right.textContent = entry.result.savedTokens > 0 ? `−${entry.result.savedTokens} tokens` : "—";
+
+    li.append(left, right);
+    li.addEventListener("click", () => {
+      psInput.value = entry.prompt;
+      psRenderResult(entry.result);
+    });
+    return li;
+  }
+
+  function psRefreshHistory() {
+    psHistoryList.innerHTML = "";
+    psHistoryEmpty.classList.toggle("hidden", psHistory.length > 0);
+    for (const entry of [...psHistory].reverse()) {
+      psHistoryList.append(psRenderHistoryRow(entry));
+    }
+  }
+
+  async function initPromptStudio() {
+    if (psInitialized) return;
+    psInitialized = true;
+
+    const { activeProject } = await window.metriq.getCaptureContext();
+    psContext.textContent = activeProject
+      ? `Checking against ${activeProject.name}`
+      : "No project linked — link one from Projects for file-aware analysis.";
+
+    psInput.addEventListener("input", () => {
+      clearTimeout(psDebounceTimer);
+      const prompt = psInput.value.trim();
+      if (!prompt) {
+        psClearResult();
+        return;
+      }
+      psDebounceTimer = setTimeout(async () => {
+        const result = await window.metriq.analyzePrompt(prompt);
+        psRenderResult(result);
+      }, 350);
+    });
+
+    psBtnCopy.addEventListener("click", async () => {
+      if (!psLatestResult) return;
+      await window.metriq.copyToClipboard(psLatestResult.focusedPrompt, {
+        promptTokens: psLatestResult.promptTokens,
+        projectedTokens: psLatestResult.projectedTokens,
+        savedTokens: psLatestResult.savedTokens,
+        savedPct: psLatestResult.savedPct,
+        rating: psLatestResult.rating,
+      });
+      refreshStats(); // same real capture stats Overview/Impact read — keep them in sync
+      const original = psBtnCopy.textContent;
+      psBtnCopy.textContent = "Copied!";
+      setTimeout(() => {
+        psBtnCopy.textContent = original;
+      }, 1200);
+    });
+
+    psBtnSnapshot.addEventListener("click", () => {
+      if (!psLatestResult) return;
+      psHistory.push({
+        timestamp: new Date().toISOString(),
+        prompt: psInput.value.trim(),
+        result: psLatestResult,
+      });
+      psRefreshHistory();
+      const original = psBtnSnapshot.textContent;
+      psBtnSnapshot.textContent = "Saved!";
+      setTimeout(() => {
+        psBtnSnapshot.textContent = original;
+      }, 1200);
+    });
+
+    psRefreshHistory();
+  }
 
   // --- Page navigation ------------------------------------------------------
 
@@ -121,10 +318,16 @@
   }
 
   for (const btn of navButtons) {
-    btn.addEventListener("click", () => showPage(btn.dataset.page));
+    btn.addEventListener("click", () => {
+      showPage(btn.dataset.page);
+      if (btn.dataset.page === "usage") refreshUsage();
+      if (btn.dataset.page === "prompt-studio") initPromptStudio();
+    });
   }
 
   btnGotoProjects?.addEventListener("click", () => showPage("projects"));
+
+  document.getElementById("btn-sidebar-avatar")?.addEventListener("click", () => showPage("settings"));
 
   // --- Auth views -----------------------------------------------------------
 
@@ -136,8 +339,9 @@
 
   function applyIdentity(session) {
     const displayName = session.name || session.email || "there";
-    document.getElementById("identity-name").textContent = displayName;
     document.getElementById("avatar-initial").textContent = displayName.charAt(0).toUpperCase();
+    const sidebarAvatar = document.getElementById("btn-sidebar-avatar");
+    if (sidebarAvatar) sidebarAvatar.title = `Signed in as ${displayName}`;
     document.getElementById("settings-identity-name").textContent = session.name || session.email;
     document.getElementById("settings-identity-email").textContent = session.email || "";
     document.getElementById("settings-avatar-initial").textContent = displayName.charAt(0).toUpperCase();
@@ -151,6 +355,7 @@
     showPage("overview");
     refreshProjects();
     initTools();
+    initAccessibility();
     refreshStats();
   }
 
@@ -164,7 +369,7 @@
   const btnCancelName = document.getElementById("btn-cancel-name");
 
   function openNameForm() {
-    settingsNameError.classList.add("hidden");
+    setAlert(settingsNameError, "");
     settingsNameInput.value = document.getElementById("settings-identity-name").textContent;
     settingsNameDisplay.classList.add("hidden");
     settingsNameForm.classList.remove("hidden");
@@ -175,7 +380,7 @@
   function closeNameForm() {
     settingsNameForm.classList.add("hidden");
     settingsNameDisplay.classList.remove("hidden");
-    settingsNameError.classList.add("hidden");
+    setAlert(settingsNameError, "");
   }
 
   btnEditName?.addEventListener("click", openNameForm);
@@ -185,8 +390,7 @@
     e.preventDefault();
     const name = settingsNameInput.value.trim();
     if (!name) {
-      settingsNameError.textContent = "Name can't be empty.";
-      settingsNameError.classList.remove("hidden");
+      setAlert(settingsNameError, "Name can't be empty.", "error");
       return;
     }
     const saveBtn = settingsNameForm.querySelector("button[type=submit]");
@@ -197,8 +401,7 @@
       applyIdentity(updatedSession);
       closeNameForm();
     } catch (err) {
-      settingsNameError.textContent = err.message || "Couldn't update your name.";
-      settingsNameError.classList.remove("hidden");
+      setAlert(settingsNameError, err.message || "Couldn't update your name.", "error");
     }
     saveBtn.disabled = false;
     saveBtn.textContent = "Save";
@@ -249,20 +452,125 @@
     }
   }
 
+  // --- Accessibility ------------------------------------------------------
+  // Same reusable toggle-row primitive as Tools (.tool-row / .tool-row-icon /
+  // .tool-row-input / .tool-row-toggle), extended with a title+description
+  // pair instead of a single label — see desktop/DESIGN.md for the toggle
+  // spec these rows follow. Each option maps 1:1 to a class applied to
+  // <html> (see styles.css and theme-init.js, which applies the saved
+  // values before first paint to avoid a flash on launch).
+
+  const ACCESSIBILITY_OPTIONS = [
+    {
+      id: "highContrast",
+      className: "high-contrast",
+      icon: "contrast",
+      label: "High contrast",
+      description: "A dedicated high-contrast palette — stronger separation between text, surfaces, borders, and controls. Defaults to your system setting until you choose explicitly.",
+    },
+    {
+      id: "reduceMotion",
+      className: "reduce-motion",
+      icon: "motion",
+      label: "Reduce motion",
+      description: "Turns off animations, transitions, and hover effects everywhere. Defaults to your system setting until you choose explicitly.",
+    },
+    {
+      id: "dyslexiaFont",
+      className: "dyslexia-font",
+      icon: "font",
+      label: "Dyslexia-friendly font",
+      description: "Switches interface text to OpenDyslexic. Code, token counts, and other monospace values are unaffected.",
+    },
+    {
+      id: "colorblind",
+      className: "colorblind",
+      icon: "eye",
+      label: "Colorblind-friendly mode",
+      description: "Shifts status colors to a palette distinguishable across common color vision deficiencies.",
+    },
+  ];
+
+  const A11Y_ICON_PATHS = {
+    contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" stroke="none"/>',
+    motion: '<path d="M4 6h11M4 12h16M4 18h8"/><path d="m17 15 3-3-3-3"/>',
+    font: '<path d="M5 19 10.5 5h2L18 19M8 14h7"/>',
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  };
+
+  async function initAccessibility() {
+    const saved = (await window.metriq.getAccessibility()) || {};
+    const canMatchMedia = typeof window.matchMedia === "function";
+    // Same OS-default pattern for both: respected only when the user has
+    // never explicitly touched the toggle in-app (see theme-init.js, which
+    // applies this identical logic before first paint).
+    const osDefaults = {
+      highContrast: canMatchMedia && window.matchMedia("(prefers-contrast: more)").matches,
+      reduceMotion: canMatchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    };
+
+    accessibilityList.innerHTML = "";
+    for (const opt of ACCESSIBILITY_OPTIONS) {
+      const explicit = saved[opt.id];
+      const isOn = explicit === true || (explicit === undefined && Boolean(osDefaults[opt.id]));
+
+      const row = document.createElement("label");
+      row.className = "tool-row a11y-row" + (isOn ? " is-checked" : "");
+
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "tool-row-icon";
+      iconWrap.innerHTML = svgIcon(A11Y_ICON_PATHS[opt.icon] || "");
+
+      const textWrap = document.createElement("span");
+      textWrap.className = "tool-row-text";
+      const title = document.createElement("span");
+      title.className = "tool-row-title";
+      title.textContent = opt.label;
+      const desc = document.createElement("span");
+      desc.className = "tool-row-desc";
+      desc.textContent = opt.description;
+      textWrap.append(title, desc);
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "tool-row-input";
+      checkbox.checked = isOn;
+      checkbox.addEventListener("change", async () => {
+        row.classList.toggle("is-checked", checkbox.checked);
+        document.documentElement.classList.toggle(opt.className, checkbox.checked);
+        await window.metriq.setAccessibility({ [opt.id]: checkbox.checked });
+      });
+
+      const toggle = document.createElement("span");
+      toggle.className = "tool-row-toggle";
+
+      row.append(iconWrap, textWrap, checkbox, toggle);
+      accessibilityList.append(row);
+    }
+  }
+
   // --- Projects -----------------------------------------------------------
 
   function showProjectsError(message) {
-    projectsError.textContent = message;
-    projectsError.classList.remove("hidden");
+    setAlert(projectsError, message, "error");
   }
 
   function clearProjectsError() {
-    projectsError.classList.add("hidden");
+    setAlert(projectsError, "");
   }
 
   function renderOverviewActiveProject(activeProject) {
     if (!activeProject) {
-      overviewActiveProject.innerHTML = `<p class="muted empty-note">No project linked yet.</p>`;
+      overviewActiveProject.innerHTML = `
+        <div class="empty-state-compact">
+          <div class="empty-state-icon-frame">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+            </svg>
+          </div>
+          <p class="muted">No project linked yet.</p>
+        </div>
+      `;
       return;
     }
     overviewActiveProject.innerHTML = "";
@@ -524,6 +832,188 @@
       sustainHistoryList.append(renderActivityRow(entry));
     }
   }
+
+  // --- Usage (real token tracking from local Claude Code / Codex logs) ------
+
+  const usageEmpty = document.getElementById("usage-empty");
+  const usageContent = document.getElementById("usage-content");
+  const usageTiles = document.getElementById("usage-tiles");
+  const usageDailyChart = document.getElementById("usage-daily-chart");
+  const usageDailyLabels = document.getElementById("usage-daily-labels");
+  const usageDailyPeak = document.getElementById("usage-daily-peak");
+  const usageInsights = document.getElementById("usage-insights");
+  const usageModels = document.getElementById("usage-models");
+  const usageSessions = document.getElementById("usage-sessions");
+  const usageMeta = document.getElementById("usage-meta");
+  const usageRangeButtons = document.querySelectorAll(".usage-range-btn");
+  const btnRefreshUsage = document.getElementById("btn-refresh-usage");
+
+  let usageDays = 30;
+
+  function fmtTok(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
+    return String(Math.round(n || 0));
+  }
+
+  function fmtShortDate(dateStr) {
+    return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function usd(n) {
+    return "$" + (n || 0).toFixed(2);
+  }
+
+  function renderUsageTile(label, value, sub) {
+    const card = document.createElement("div");
+    card.className = "stat-card";
+    const v = document.createElement("span");
+    v.className = "stat-value";
+    v.textContent = value;
+    const l = document.createElement("span");
+    l.className = "stat-label";
+    l.textContent = label;
+    card.append(v, l);
+    if (sub) {
+      const s = document.createElement("span");
+      s.className = "activity-time muted";
+      s.textContent = sub;
+      card.append(s);
+    }
+    return card;
+  }
+
+  function renderUsageInsight(insight) {
+    const div = document.createElement("div");
+    div.className = `usage-insight ${insight.severity}`;
+    const h = document.createElement("h3");
+    h.textContent = insight.title;
+    const evidence = document.createElement("p");
+    evidence.textContent = insight.evidence;
+    const action = document.createElement("p");
+    action.className = "usage-insight-action";
+    action.textContent = `→ ${insight.action}`;
+    div.append(h, evidence, action);
+    return div;
+  }
+
+  function renderUsageModelRow(model, maxCost) {
+    const row = document.createElement("div");
+    row.className = "usage-model-row";
+    const label = document.createElement("div");
+    label.className = "usage-model-label";
+    const name = document.createElement("span");
+    name.textContent = model.label;
+    const cost = document.createElement("span");
+    cost.className = "cost";
+    cost.textContent = usd(model.costUSD);
+    label.append(name, cost);
+    const track = document.createElement("div");
+    track.className = "usage-model-bar-track";
+    const fill = document.createElement("div");
+    fill.className = "usage-model-bar-fill";
+    fill.style.width = `${maxCost > 0 ? (model.costUSD / maxCost) * 100 : 0}%`;
+    track.append(fill);
+    row.append(label, track);
+    return row;
+  }
+
+  function renderUsageSessionRow(session) {
+    const li = document.createElement("li");
+    li.className = "activity-item";
+    const left = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "activity-title";
+    title.textContent = session.project;
+    const time = document.createElement("div");
+    time.className = "activity-time muted";
+    time.textContent = `${session.requests} reqs · ${fmtTok(session.totalTokens)} tok`;
+    left.append(title, time);
+    const right = document.createElement("div");
+    right.className = "activity-savings";
+    right.textContent = usd(session.costUSD);
+    li.append(left, right);
+    return li;
+  }
+
+  async function refreshUsage() {
+    const data = await window.metriq.getUsage(usageDays);
+    const available = Boolean(data && data.available);
+    usageEmpty.classList.toggle("hidden", available);
+    usageContent.classList.toggle("hidden", !available);
+    if (!available) return;
+
+    const t = data.totals;
+    const reqs = (data.models || []).reduce((sum, m) => sum + m.requests, 0);
+    usageTiles.innerHTML = "";
+    usageTiles.append(
+      renderUsageTile("Total tokens", fmtTok(t.totalTokens), `${reqs} requests`),
+      renderUsageTile("Total cost", usd(t.costUSD), "API-equivalent"),
+      renderUsageTile("Saved by caching", usd(t.cacheSavingsUSD), `${fmtTok(t.cacheReadTokens)} cached`),
+      renderUsageTile("Output tokens", fmtTok(t.outputTokens), `${fmtTok(t.inputTokens)} input`)
+    );
+
+    const daily = data.daily || [];
+    const dmax = Math.max(...daily.map((d) => d.totalTokens), 1);
+    usageDailyChart.innerHTML = "";
+    for (const d of daily) {
+      const bar = document.createElement("div");
+      bar.className = "usage-bar";
+      bar.style.height = `${Math.max((d.totalTokens / dmax) * 100, 1)}%`;
+      bar.title = `${fmtShortDate(d.date)} · ${fmtTok(d.totalTokens)} tokens`;
+      usageDailyChart.append(bar);
+    }
+
+    // A handful of date ticks under the bars (first/middle/last) so the
+    // range has a reference point without crowding — exact value + date
+    // for any single day is still available via the bar's hover tooltip.
+    usageDailyLabels.innerHTML = "";
+    if (daily.length) {
+      const tickIdxs = [...new Set([0, Math.floor((daily.length - 1) / 2), daily.length - 1])];
+      for (const i of tickIdxs) {
+        const span = document.createElement("span");
+        span.textContent = fmtShortDate(daily[i].date);
+        usageDailyLabels.append(span);
+      }
+    }
+
+    const peakDay = daily.reduce((max, d) => (!max || d.totalTokens > max.totalTokens ? d : max), null);
+    usageDailyPeak.textContent =
+      peakDay && peakDay.totalTokens > 0 ? `Peak: ${fmtTok(peakDay.totalTokens)} on ${fmtShortDate(peakDay.date)}` : "";
+
+    const insights = data.insights || [];
+    usageInsights.innerHTML = "";
+    if (!insights.length) {
+      const p = document.createElement("p");
+      p.className = "muted empty-note";
+      p.textContent = "No issues flagged — usage looks healthy.";
+      usageInsights.append(p);
+    } else {
+      for (const insight of insights) usageInsights.append(renderUsageInsight(insight));
+    }
+
+    const models = data.models || [];
+    const maxCost = Math.max(...models.map((m) => m.costUSD), 0);
+    usageModels.innerHTML = "";
+    for (const model of models) usageModels.append(renderUsageModelRow(model, maxCost));
+
+    usageSessions.innerHTML = "";
+    for (const session of (data.sessions || []).slice(0, 10)) {
+      usageSessions.append(renderUsageSessionRow(session));
+    }
+
+    usageMeta.textContent = `sources: ${(data.sources || []).join(", ")} · last ${data.days}d · updated ${new Date().toLocaleTimeString()}`;
+  }
+
+  for (const btn of usageRangeButtons) {
+    btn.addEventListener("click", () => {
+      usageDays = parseInt(btn.dataset.days, 10);
+      for (const b of usageRangeButtons) b.classList.toggle("is-active", b === btn);
+      refreshUsage();
+    });
+  }
+
+  btnRefreshUsage?.addEventListener("click", () => refreshUsage());
 
   window.metriq.onAuthSuccess((session) => {
     if (session) showLoggedIn(session);

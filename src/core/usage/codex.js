@@ -62,6 +62,9 @@ function parseRolloutFile(filePath) {
   let modelIsFallback = true;
   let prevTotal = 0;
   let rateLimits = null;
+  // The user prompt that started the turn currently in flight; each
+  // token_count that follows is attributed to it (intent/waste breakdowns).
+  let currentPrompt = null;
 
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
@@ -86,6 +89,16 @@ function parseRolloutFile(filePath) {
       if (payload.model) {
         model = payload.model;
         modelIsFallback = false;
+      }
+      continue;
+    }
+
+    if (entry.type === "event_msg" && payload.type === "user_message") {
+      const text_ = typeof payload.message === "string" ? payload.message.trim() : "";
+      // Skip injected context blocks (environment/system wrappers), keep
+      // genuinely typed prompts.
+      if (text_ && !text_.startsWith("<") && !text_.startsWith("#")) {
+        currentPrompt = text_.slice(0, 500);
       }
       continue;
     }
@@ -129,6 +142,7 @@ function parseRolloutFile(filePath) {
       timestamp: entry.timestamp,
       model: model || FALLBACK_MODEL,
       modelIsFallback: model ? undefined : true,
+      prompt: currentPrompt,
       ...usage,
     });
   }
