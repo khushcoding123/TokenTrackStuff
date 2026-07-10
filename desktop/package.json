@@ -23,6 +23,7 @@
     "files": ["src/**/*", "renderer/**/*", "package.json"],
     "extraResources": [
       { "from": "../packages/core", "to": "packages/core" },
+      { "from": "../packages/optimize", "to": "packages/optimize" },
       { "from": "../src/core/usage", "to": "src/core/usage" }
     ],
     "protocols": {
