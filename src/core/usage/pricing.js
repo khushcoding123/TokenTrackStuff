@@ -26,6 +26,10 @@ const PRICING_TABLE = [
   { match: "codex", label: "Codex", input: 1.25, output: 10, cacheWrite: 0, cacheRead: 0.125 },
   { match: "gpt-4o", modifier: "mini", label: "GPT-4o mini", input: 0.15, output: 0.6, cacheWrite: 0, cacheRead: 0.075 },
   { match: "gpt-4o", label: "GPT-4o", input: 2.5, output: 10, cacheWrite: 0, cacheRead: 1.25 },
+
+  // Cursor transcripts carry no model id; records use the synthetic
+  // "cursor-agent" id and mid-tier pricing so estimates stay conservative.
+  { match: "cursor-agent", label: "Cursor Agent", input: 3, output: 15, cacheWrite: 0, cacheRead: 0.3 },
 ];
 
 // Family defaults used when nothing in the table matches.

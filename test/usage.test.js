@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 
 import { loadClaudeRecords } from "../src/core/usage/claude.js";
 import { loadCodexUsage } from "../src/core/usage/codex.js";
+import { loadCursorRecords } from "../src/core/usage/cursor.js";
 import { pricingFor, costForRecord, cacheSavingsForRecord } from "../src/core/usage/pricing.js";
 import { aggregate, BLOCK_MS } from "../src/core/usage/aggregate.js";
 import { generateInsights } from "../src/core/usage/insights.js";
@@ -16,6 +17,7 @@ import { generateInsights } from "../src/core/usage/insights.js";
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 const CLAUDE_DIR = join(FIXTURES, "claude", "projects");
 const CODEX_DIR = join(FIXTURES, "codex", "sessions");
+const CURSOR_DIR = join(FIXTURES, "cursor", "projects");
 
 // Convenience factory for synthetic normalized records.
 function rec(overrides = {}) {
@@ -133,6 +135,69 @@ test("codex parser: legacy files without turn_context fall back and use cumulati
     legacy[0].inputTokens + legacy[0].outputTokens + legacy[0].cacheReadTokens +
     legacy[1].inputTokens + legacy[1].outputTokens + legacy[1].cacheReadTokens;
   assert.ok(totalLegacy <= 8300, `legacy total ${totalLegacy} must not exceed cumulative 8300`);
+});
+
+test("cursor parser: normalizes transcript entries with usage metadata", () => {
+  const records = loadCursorRecords({ dir: CURSOR_DIR });
+  assert.equal(records.length, 1);
+  assert.equal(records[0].source, "cursor");
+  assert.equal(records[0].sessionId, "cursor-session-001");
+  assert.equal(records[0].project, "myapp");
+  assert.equal(records[0].model, "claude-3.5-sonnet");
+  assert.equal(records[0].inputTokens, 1200);
+  assert.equal(records[0].outputTokens, 240);
+  assert.equal(records[0].cacheCreationTokens, 300);
+  assert.equal(records[0].cacheReadTokens, 1800);
+  assert.match(records[0].prompt, /Fix the dashboard card spacing/);
+  // Real usage metadata was present, so this is not an estimate.
+  assert.notEqual(records[0].estimated, true);
+});
+
+test("cursor parser: transcripts without usage metadata get estimated token counts", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "metriq-cursor-fixture-"));
+  try {
+    const chatDir = join(tmp, "Users-dev-otherapp", "agent-transcripts", "chat-estimated");
+    mkdirSync(chatDir, { recursive: true });
+    writeFileSync(
+      join(chatDir, "chat-estimated.jsonl"),
+      [
+        JSON.stringify({
+          role: "user",
+          message: {
+            content: [
+              {
+                type: "text",
+                text: "<timestamp>Tuesday, Jul 7, 2026, 1:20 PM (UTC-7)</timestamp>\n<user_query>\nfix the sidebar bug\n</user_query>",
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          role: "assistant",
+          message: {
+            content: [{ type: "text", text: "I found the issue in the sidebar component and fixed the broken class name." }],
+          },
+        }),
+        "",
+      ].join("\n"),
+      "utf8"
+    );
+
+    const records = loadCursorRecords({ dir: tmp });
+    assert.equal(records.length, 1);
+    const r = records[0];
+    assert.equal(r.source, "cursor");
+    assert.equal(r.project, "otherapp");
+    assert.equal(r.estimated, true);
+    assert.equal(r.model, "cursor-agent");
+    assert.equal(r.prompt, "fix the sidebar bug");
+    // Human-readable timestamp is converted to the correct UTC instant.
+    assert.equal(r.timestamp, "2026-07-07T20:20:00.000Z");
+    assert.ok(r.inputTokens > 0, "prompt tokens estimated");
+    assert.ok(r.outputTokens > 0, "assistant tokens estimated");
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test("pricing: model matching, modifiers, and unknown-model fallback", () => {

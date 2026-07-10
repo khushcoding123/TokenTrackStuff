@@ -1,0 +1,2 @@
+{"role":"user","message":{"content":[{"type":"text","text":"<timestamp>2026-01-15T11:59:00.000Z</timestamp>\n<user_query>\nFix the dashboard card spacing\n</user_query>"}]}}
+{"timestamp":"2026-01-15T12:00:00.000Z","role":"assistant","message":{"model":"claude-3.5-sonnet","usage":{"input_tokens":1200,"output_tokens":240,"cache_creation_input_tokens":300,"cache_read_input_tokens":1800},"content":[{"type":"text","text":"Done."}]}}

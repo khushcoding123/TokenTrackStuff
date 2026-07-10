@@ -1,10 +1,11 @@
 // `metriq trace` — run in any project and token tracking begins.
 //
-// Reads the local Claude Code + Codex session logs on this machine, prices and
-// aggregates them with the shared usage engine (src/core/usage — the exact same
-// code behind the web /usage dashboard), and serves a live localhost dashboard.
-// This is the local counterpart to the hosted dashboard: same numbers, but it
-// can actually see your machine's logs (a deployed server can't).
+// Reads the local Claude Code + Codex + Cursor session logs on this machine,
+// prices and aggregates them with the shared usage engine (src/core/usage —
+// the exact same code behind the web /usage dashboard), and serves a live
+// localhost dashboard. This is the local counterpart to the hosted dashboard:
+// same numbers, but it can actually see your machine's logs (a deployed
+// server can't).
 
 import crypto from "node:crypto";
 import { watch } from "node:fs";
@@ -12,6 +13,7 @@ import { spawn } from "node:child_process";
 
 import { getClaudeDirs, loadClaudeRecords } from "../core/usage/claude.js";
 import { getCodexSessionsDir, loadCodexUsage } from "../core/usage/codex.js";
+import { getCursorProjectsDir, loadCursorRecords } from "../core/usage/cursor.js";
 import { aggregate } from "../core/usage/aggregate.js";
 import { generateInsights } from "../core/usage/insights.js";
 import { analyzeCurrentSession } from "../core/usage/behavior.js";
@@ -26,6 +28,7 @@ function buildPayload(days) {
   const sources = [];
   if (getClaudeDirs().length) sources.push("claude-code");
   if (getCodexSessionsDir()) sources.push("codex");
+  if (getCursorProjectsDir()) sources.push("cursor");
   if (!sources.length) return { available: false, sources: [] };
 
   const since = new Date(Date.now() - (days + 2) * 24 * 60 * 60 * 1000);
@@ -37,6 +40,7 @@ function buildPayload(days) {
     records.push(...codex.records);
     rateLimits = codex.rateLimits;
   }
+  if (sources.includes("cursor")) records.push(...loadCursorRecords({ since }));
   if (!records.length) return { available: false, sources };
 
   const agg = aggregate(records, { days });
@@ -113,6 +117,8 @@ export async function runTrace(flags = {}) {
   const watchDirs = [...getClaudeDirs()];
   const codexDir = getCodexSessionsDir();
   if (codexDir) watchDirs.push(codexDir);
+  const cursorDir = getCursorProjectsDir();
+  if (cursorDir) watchDirs.push(cursorDir);
   let watching = 0;
   const onChange = () => {
     dirty = true;
