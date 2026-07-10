@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog, globalShortcut, clipboard, screen } = require("electron");
 const path = require("node:path");
+const { execFile } = require("node:child_process");
 const { saveSession, loadSession, clearSession } = require("./auth-store");
 const { PROTOCOL, findProtocolUrlInArgv, parseAuthCallbackUrl } = require("./protocol");
 const { saveFileIndex, loadFileIndex, removeFileIndex } = require("./project-cache");
@@ -61,14 +62,68 @@ let seededPrompt = null;
 // doesn't re-trigger the popup in a loop.
 let lastAppliedText = "";
 
-// Auto-capture "source": watch the clipboard for prompt-like text. We can't read
-// another app's input box directly (see prompt-watcher.js / the UIA probe), so
-// the trigger is you copying your prompt (Ctrl+C). Only your clipboard is read,
-// and only locally — nothing is sent anywhere.
-function clipboardPromptSource() {
+// Auto-capture "source": watch the clipboard for prompt-like text COPIED FROM A
+// CODING APP. We can't read another app's input box directly (see
+// prompt-watcher.js / the UIA probe), so the trigger is you copying your prompt
+// (Ctrl+C). Only your clipboard is read, and only locally — nothing is sent
+// anywhere. The foreground-app check keeps it from popping when you copy text
+// for non-coding reasons (a browser, a chat, notes, etc.).
+let lastCheckedClipboard = "";
+
+async function clipboardPromptSource() {
   const text = clipboard.readText();
   if (!text || text === lastAppliedText) return "";
-  return looksLikePrompt(text) ? text : "";
+  if (text === lastCheckedClipboard) return ""; // already evaluated this exact copy
+  lastCheckedClipboard = text;
+  if (!looksLikePrompt(text)) return "";
+  const app = await getForegroundApp();
+  return passesCodingGate(app) ? text : "";
+}
+
+// --- Foreground coding-app detection (Windows) --------------------------------
+// Process names (lowercased) that count as "coding": editors, IDEs, and the
+// terminals where CLI agents (Claude Code, Codex) run. Extend as needed.
+const CODING_APPS = [
+  "cursor", "code", "code - insiders", "vscodium", "windsurf", "zed", "fleet",
+  "devenv", "sublime_text", "atom", "brackets", "notepad++",
+  "idea64", "pycharm64", "webstorm64", "goland64", "clion64", "phpstorm64",
+  "rubymine64", "rider64", "datagrip64", "android studio",
+  "windowsterminal", "wt", "powershell", "pwsh", "cmd", "conhost",
+  "alacritty", "wezterm", "hyper", "warp", "tabby", "mintty", "nvim", "vim",
+];
+
+function isCodingApp(name) {
+  const n = String(name || "").toLowerCase();
+  return CODING_APPS.some((a) => n.includes(a));
+}
+
+// Falsy app (couldn't determine) => fail OPEN so the feature still works; a real
+// process name => it must be in the coding allowlist to trigger.
+function passesCodingGate(app) {
+  if (!app) return true;
+  return isCodingApp(app);
+}
+
+// Inline PowerShell (no external file, so it also works in a packaged app) that
+// returns the foreground window's process name. Add-Type compiles per call
+// (~1s), but we only call it once per newly-copied clipboard value.
+const FG_CMD =
+  '$s=\'[DllImport("user32.dll")]public static extern IntPtr GetForegroundWindow();' +
+  '[DllImport("user32.dll")]public static extern int GetWindowThreadProcessId(IntPtr h,out int p);\';' +
+  "$t=Add-Type -MemberDefinition $s -Name U -Namespace Fg -PassThru;" +
+  "$h=$t::GetForegroundWindow();$p=0;$t::GetWindowThreadProcessId($h,[ref]$p)|Out-Null;" +
+  "(Get-Process -Id $p -ErrorAction SilentlyContinue).ProcessName";
+
+function getForegroundApp() {
+  return new Promise((resolve) => {
+    if (process.platform !== "win32") return resolve(null); // detection is Windows-only for now
+    execFile(
+      "powershell",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", FG_CMD],
+      { timeout: 3000, windowsHide: true },
+      (err, stdout) => resolve(err ? undefined : String(stdout).trim().toLowerCase())
+    );
+  });
 }
 
 // Lazily create the background watcher and route detected prompts into the
