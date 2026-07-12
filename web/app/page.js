@@ -7,6 +7,11 @@ import { getCodexSessionsDir } from "../../src/core/usage/codex.js";
 export const dynamic = "force-dynamic";
 
 const RELEASES_URL = "https://github.com/khushcoding123/TokenTrackStuff/releases";
+// Direct one-click download of the latest release's Windows asset. GitHub's
+// /releases/latest/download/<name> URL always resolves to the newest release's
+// asset with that exact filename — so publish the build named "Metriq-Windows.zip".
+const WIN_DOWNLOAD =
+  "https://github.com/khushcoding123/TokenTrackStuff/releases/latest/download/Metriq-Windows.zip";
 
 const STEPS = [
   {
@@ -65,9 +70,7 @@ export default async function LandingPage({ searchParams }) {
         <nav className="flex items-center gap-2 md:gap-4">
           <a
             className="bg-primary/10 border border-primary text-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/20 transition-all duration-300"
-            href={RELEASES_URL}
-            rel="noreferrer noopener"
-            target="_blank"
+            href={WIN_DOWNLOAD}
           >
             Download
           </a>
@@ -91,15 +94,13 @@ export default async function LandingPage({ searchParams }) {
           <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
             <a
               className="bg-primary text-on-primary px-6 py-3 rounded-lg font-label-md text-label-md hover:opacity-90 transition-all duration-300 flex items-center gap-2"
-              href={RELEASES_URL}
-              rel="noreferrer noopener"
-              target="_blank"
+              href={WIN_DOWNLOAD}
             >
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              Download for macOS
+              <span className="material-symbols-outlined text-[18px]">desktop_windows</span>
+              Download for Windows
             </a>
             {[
-              { os: "Windows", icon: "desktop_windows" },
+              { os: "macOS", icon: "laptop_mac" },
               { os: "Linux", icon: "dns" },
             ].map((d) => (
               <a
