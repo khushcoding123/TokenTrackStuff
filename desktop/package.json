@@ -8,9 +8,9 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "package:mac": "electron-builder --mac --dir",
-    "package:win": "electron-builder --win nsis",
-    "package:linux": "electron-builder --linux AppImage"
+    "package:mac": "electron-builder --mac",
+    "package:win": "electron-builder --win",
+    "package:linux": "electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^43.1.0",
@@ -33,20 +33,19 @@
     "mac": {
       "icon": "renderer/assets/icon.icns",
       "category": "public.app-category.developer-tools",
-      "target": "dir"
+      "target": "zip",
+      "artifactName": "Metriq-macOS.zip"
     },
     "win": {
       "icon": "renderer/assets/icon.png",
-      "target": ["nsis"]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "artifactName": "Metriq-Windows.zip"
     },
     "linux": {
       "icon": "renderer/assets/icon.png",
       "category": "Development",
-      "target": ["AppImage"]
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "artifactName": "Metriq-Linux.AppImage"
     }
   }
 }
