@@ -1,0 +1,133 @@
+/* Metriq extension UI. Prefixed + high z-index + explicit values so the host
+   site's stylesheet can't bleed in. Dark, matches the Metriq green accent. */
+
+.metriq-fab {
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 104px !important;
+  z-index: 2147483646 !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: #12a150 !important;
+  color: #fff !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.15s ease, background 0.15s ease !important;
+  font-family: system-ui, sans-serif !important;
+}
+.metriq-fab:hover {
+  background: #15b85b !important;
+  transform: scale(1.06) !important;
+}
+
+.metriq-panel {
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 160px !important;
+  z-index: 2147483647 !important;
+  width: 380px !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: 70vh !important;
+  overflow: auto !important;
+  background: #0f140f !important;
+  color: #f1f4ef !important;
+  border: 1px solid #232c22 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45) !important;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+.metriq-body { padding: 14px 16px !important; }
+
+.metriq-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-weight: 700 !important;
+  margin-bottom: 10px !important;
+  color: #12a150 !important;
+}
+.metriq-badge {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  text-transform: capitalize !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #a9b3a4 !important;
+}
+.metriq-focused { background: rgba(75, 226, 119, 0.15) !important; color: #4be277 !important; }
+.metriq-moderate { background: rgba(250, 178, 25, 0.15) !important; color: #fab219 !important; }
+.metriq-broad { background: rgba(230, 103, 103, 0.15) !important; color: #e66767 !important; }
+
+.metriq-save {
+  font-size: 12px !important;
+  color: #4be277 !important;
+  background: rgba(75, 226, 119, 0.1) !important;
+  border: 1px solid rgba(75, 226, 119, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.metriq-issues {
+  list-style: none !important;
+  margin: 0 0 10px 0 !important;
+  padding: 0 !important;
+  color: #a9b3a4 !important;
+  font-size: 12px !important;
+}
+.metriq-issues li { margin: 2px 0 !important; }
+.metriq-issues li::before { content: "• " !important; color: #727c6d !important; }
+
+.metriq-label {
+  font-size: 10px !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: #727c6d !important;
+  margin-bottom: 4px !important;
+}
+.metriq-improved {
+  background: #141a14 !important;
+  border: 1px solid #33402f !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  white-space: pre-wrap !important;
+  color: #f1f4ef !important;
+  margin-bottom: 12px !important;
+}
+.metriq-tip { color: #a9b3a4 !important; margin: 6px 0 12px !important; }
+
+.metriq-actions {
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+  flex-wrap: wrap !important;
+}
+.metriq-btn {
+  font-family: inherit !important;
+  font-size: 12.5px !important;
+  padding: 7px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid #33402f !important;
+  background: #141a14 !important;
+  color: #f1f4ef !important;
+  cursor: pointer !important;
+}
+.metriq-btn:hover { border-color: #4be277 !important; }
+.metriq-btn-primary {
+  background: #12a150 !important;
+  border-color: #12a150 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+.metriq-btn-primary:hover { background: #15b85b !important; }
+.metriq-btn-ghost { background: transparent !important; border-color: transparent !important; color: #a9b3a4 !important; }
