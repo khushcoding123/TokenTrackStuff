@@ -6,6 +6,10 @@
   const btnSignup = document.getElementById("btn-signup");
   const btnLogout = document.getElementById("btn-logout");
   const btnLinkProject = document.getElementById("btn-link-project");
+  const btnLinkGithub = document.getElementById("btn-link-github");
+  const githubLinkForm = document.getElementById("github-link-form");
+  const githubUrlInput = document.getElementById("github-url-input");
+  const btnGithubCancel = document.getElementById("btn-github-cancel");
   const btnGotoProjects = document.getElementById("btn-goto-projects");
   const projectsList = document.getElementById("projects-list");
   const projectsEmpty = document.getElementById("projects-empty");
@@ -25,30 +29,131 @@
   const ovInsights = document.getElementById("ov-insights");
   const btnGotoStudio = document.getElementById("btn-goto-studio");
   const btnOvFirstPrompt = document.getElementById("btn-ov-first-prompt");
+  const ovToolsQuick = document.getElementById("ov-tools-quick");
+  const btnGotoTools = document.getElementById("btn-goto-tools");
 
+  // status: "supported" (a named platform Metriq's copy explicitly targets)
+  // or "generic" (the catch-all bucket) — an honest two-way split, not a
+  // fabricated maturity tier. All five toggles are identically implemented
+  // today (local preference only, see the page subtitle); there's no real
+  // per-tool Beta/Preview distinction to report.
   const AVAILABLE_TOOLS = [
-    { id: "claude", label: "Claude", icon: "sparkle" },
-    { id: "chatgpt", label: "ChatGPT", icon: "knot" },
-    { id: "vscode", label: "VS Code", icon: "brackets" },
-    { id: "cursor", label: "Cursor", icon: "cursor" },
-    { id: "other", label: "Other / terminal", icon: "terminal" },
+    {
+      id: "claude",
+      label: "Claude",
+      icon: "sparkle",
+      logoFile: "claude.png",
+      description: "Best for long-context reasoning and document-heavy work.",
+      status: "supported",
+    },
+    {
+      id: "chatgpt",
+      label: "ChatGPT",
+      icon: "knot",
+      logoFile: "chatgpt.webp",
+      description: "Broad general-purpose assistant across OpenAI's models.",
+      status: "supported",
+    },
+    {
+      id: "vscode",
+      label: "VS Code",
+      icon: "brackets",
+      logoFile: "vscode.svg",
+      description: "Coding assistants and extensions inside your editor.",
+      status: "supported",
+    },
+    {
+      id: "cursor",
+      label: "Cursor",
+      icon: "cursor",
+      logoFile: "cursor.png",
+      description: "AI-native editor built around in-context coding.",
+      status: "supported",
+    },
+    {
+      id: "other",
+      label: "Other / terminal",
+      icon: "terminal",
+      // No logoFile — this is a generic catch-all, not a real brand.
+      description: "Any other AI tool, including CLI-based assistants.",
+      status: "generic",
+    },
   ];
 
-  // Stylized single-color glyphs evoking each tool's mark — not literal
-  // reproductions of trademarked logos (no bundled brand assets, and the
-  // CSP blocks fetching real ones remotely), but distinct from each other
-  // and from generic chat/app iconography.
+  // Purely informational — not toggleable, nothing persisted. Honest
+  // "not built yet" placeholders rather than inert copies of the real
+  // toggles above.
+  const FUTURE_TOOLS = [
+    {
+      label: "Windsurf",
+      icon: "wave",
+      logoFile: "windsurf.jpeg",
+      description: "Agentic in-editor AI coding, similar footprint to Cursor.",
+    },
+    {
+      label: "Gemini",
+      icon: "gemini",
+      logoFile: "gemini.png",
+      description: "Google's multimodal model family, built into Workspace and Search.",
+    },
+    {
+      label: "GitHub Copilot Chat",
+      icon: "octo",
+      logoFile: "github-copilot.png",
+      description: "In-IDE chat layered on top of Copilot completions.",
+    },
+    {
+      label: "Perplexity",
+      icon: "perplexity",
+      logoFile: "perplexity.webp",
+      description: "AI-powered answer engine with cited, real-time web search.",
+    },
+  ];
+
+  // Fallback glyphs — stylized single-color marks used until a real logo
+  // file (see desktop/renderer/assets/logos/README.md) exists for that
+  // tool, and permanently for "Other / terminal" (no real brand). Not
+  // literal logo reproductions: distinct from each other and from generic
+  // chat/app iconography.
   const TOOL_ICONS = {
     sparkle:
       '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
     knot: '<circle cx="12" cy="7.5" r="3"/><circle cx="7" cy="15.5" r="3"/><circle cx="17" cy="15.5" r="3"/>',
     brackets: '<path d="m8 4-6 8 6 8M16 4l6 8-6 8"/>',
     cursor: '<path d="m4 4 7 17 2.5-7.5L21 11 4 4Z"/>',
+    wave: '<path d="M3 15c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/><path d="M3 9c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/>',
+    octo: '<circle cx="12" cy="9" r="5"/><path d="M7 13v3a2 2 0 0 0 2 2M17 13v3a2 2 0 0 1-2 2M9 9h.01M15 9h.01M6 20l1.5-2M18 20l-1.5-2"/>',
+    gemini: '<circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/>',
+    perplexity: '<circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/>',
     terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
   };
 
   function svgIcon(pathMarkup, extraClass = "") {
     return `<svg class="icon ${extraClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${pathMarkup}</svg>`;
+  }
+
+  // Renders a tool's real logo file if one exists (see assets/logos/
+  // README.md); silently falls back to the hand-drawn glyph if the file is
+  // missing (a normal 404 while logos are added one at a time, not an
+  // error worth surfacing) or the tool has none (e.g. "Other / terminal").
+  function renderToolIcon(container, tool) {
+    container.innerHTML = "";
+    if (!tool.logoFile) {
+      container.innerHTML = svgIcon(TOOL_ICONS[tool.icon] || "");
+      return;
+    }
+    const img = document.createElement("img");
+    img.className = "itg-tool-logo";
+    img.src = `assets/logos/${tool.logoFile}`;
+    img.alt = "";
+    img.addEventListener(
+      "error",
+      () => {
+        container.innerHTML = svgIcon(TOOL_ICONS[tool.icon] || "");
+      },
+      { once: true }
+    );
+    container.append(img);
   }
 
   // --- Overview (home) -----------------------------------------------------
@@ -191,6 +296,50 @@
     }
   }
 
+  // Read-only glance at the Tools page's saved preference chips — fills the
+  // rest of the side column below Suggestions with real (already-persisted)
+  // data instead of stretching Suggestions itself to an arbitrary height.
+  async function renderOverviewTools() {
+    if (!ovToolsQuick) return;
+    const selected = await window.metriq.getTools();
+    ovToolsQuick.innerHTML = "";
+
+    if (!selected || selected.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "ov-empty";
+      empty.innerHTML = `
+        <div class="ov-empty-icon">${svgIcon(OV_ICON_PATHS.lightbulb)}</div>
+        <p class="ov-empty-title">No tools set yet</p>
+        <p class="ov-empty-desc">Pick the coding tools you use so feedback and suggestions can be framed for them.</p>
+      `;
+      const chooseBtn = document.createElement("button");
+      chooseBtn.type = "button";
+      chooseBtn.className = "ov-btn-secondary";
+      chooseBtn.textContent = "Choose your tools";
+      chooseBtn.addEventListener("click", () => showPage("tools"));
+      empty.append(chooseBtn);
+      ovToolsQuick.append(empty);
+      return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "ov-tools-quick";
+    for (const id of selected) {
+      const tool = AVAILABLE_TOOLS.find((t) => t.id === id);
+      if (!tool) continue;
+      const chip = document.createElement("span");
+      chip.className = "ov-tool-chip";
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "ov-tool-chip-icon";
+      iconWrap.innerHTML = svgIcon(TOOL_ICONS[tool.icon] || "");
+      const label = document.createElement("span");
+      label.textContent = tool.label;
+      chip.append(iconWrap, label);
+      row.append(chip);
+    }
+    ovToolsQuick.append(row);
+  }
+
   // --- Semantic alert (replaces raw error-text paragraphs) -----------------
   // Reusable across Projects' load/link/rescan/remove errors and the
   // Settings display-name form — one visual component, driven by a
@@ -300,7 +449,11 @@
 
   const psContext = document.getElementById("ps-context");
   const psInput = document.getElementById("ps-input");
-  const psEmptyHint = document.getElementById("ps-empty-hint");
+  const psStatusBanner = document.getElementById("ps-status-banner");
+  const psHeaderBadge = document.getElementById("ps-header-badge");
+  const psCharCount = document.getElementById("ps-char-count");
+  const psTokenEstimate = document.getElementById("ps-token-estimate");
+  const psBtnClear = document.getElementById("ps-btn-clear");
   const psResults = document.getElementById("ps-results");
   const psRating = document.getElementById("ps-rating");
   const psScore = document.getElementById("ps-score");
@@ -312,17 +465,60 @@
   const psFocused = document.getElementById("ps-focused");
   const psBtnCopy = document.getElementById("ps-btn-copy");
   const psBtnSnapshot = document.getElementById("ps-btn-snapshot");
+  const psBtnSnapshotEmpty = document.getElementById("ps-btn-snapshot-empty");
   const psHistoryList = document.getElementById("ps-history-list");
   const psHistoryEmpty = document.getElementById("ps-history-empty");
 
   let psInitialized = false;
   let psDebounceTimer = null;
   let psLatestResult = null;
-  const psHistory = []; // session-only: { timestamp, prompt, result }
+  let psVersionCounter = 0;
+  const psHistory = []; // session-only: { version, timestamp, prompt, result }
+
+  const PS_FOLDER_ICON = '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>';
+  const PS_FOLDER_PLUS_ICON =
+    '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M12 10v6M9 13h6"/>';
+
+  function psRenderContext(activeProject) {
+    psContext.classList.toggle("is-linked", Boolean(activeProject));
+    psContext.classList.toggle("is-warning", !activeProject);
+    psContext.innerHTML = "";
+
+    const icon = document.createElement("span");
+    icon.className = "ps-context-icon";
+    icon.innerHTML = svgIcon(activeProject ? PS_FOLDER_ICON : PS_FOLDER_PLUS_ICON, "icon-sm");
+
+    const text = document.createElement("span");
+    text.className = "ps-context-text";
+    if (activeProject) {
+      text.innerHTML = `Checking against <strong></strong>`;
+      text.querySelector("strong").textContent = activeProject.name;
+      psContext.append(icon, text);
+      return;
+    }
+
+    text.textContent = "No project linked — analysis won't be file-aware.";
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "ps-context-action";
+    action.textContent = "Link a project";
+    action.addEventListener("click", () => showPage("projects"));
+    psContext.append(icon, text, action);
+  }
+
+  function psUpdateToolbar() {
+    const len = psInput.value.length;
+    psCharCount.textContent = `${len.toLocaleString()} character${len === 1 ? "" : "s"}`;
+    psTokenEstimate.textContent = psLatestResult
+      ? `~${psLatestResult.promptTokens.toLocaleString()} tokens`
+      : "— tokens";
+  }
 
   function psRenderResult(result) {
     psResults.classList.remove("hidden");
-    psEmptyHint.classList.add("hidden");
+    psStatusBanner.classList.add("hidden");
+    psHeaderBadge.textContent = "Live analysis";
+    psHeaderBadge.classList.remove("ps-header-badge-idle");
 
     psRating.textContent = result.rating;
     psRating.className = `capture-badge rating-${result.rating}`;
@@ -350,37 +546,84 @@
 
     psFocused.textContent = result.focusedPrompt;
     psLatestResult = result;
+    psUpdateToolbar();
   }
 
   function psClearResult() {
     psResults.classList.add("hidden");
-    psEmptyHint.classList.remove("hidden");
+    psStatusBanner.classList.remove("hidden");
+    psHeaderBadge.textContent = "Ready";
+    psHeaderBadge.classList.add("ps-header-badge-idle");
     psLatestResult = null;
+    psUpdateToolbar();
   }
+
+  // Shared by the results panel's button and the empty revision-history
+  // panel's button — with nothing analyzed yet, "saving" has nothing to
+  // capture, so it focuses the editor instead of pretending to save.
+  function psSaveSnapshot(triggerBtn) {
+    if (!psLatestResult) {
+      psInput.focus();
+      return;
+    }
+    psHistory.push({
+      version: ++psVersionCounter,
+      timestamp: new Date().toISOString(),
+      prompt: psInput.value.trim(),
+      result: psLatestResult,
+    });
+    psRefreshHistory();
+    const original = triggerBtn.textContent;
+    triggerBtn.textContent = "Saved!";
+    setTimeout(() => {
+      triggerBtn.textContent = original;
+    }, 1200);
+  }
+
+  const PS_RESTORE_ICON = '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/>';
 
   function psRenderHistoryRow(entry) {
     const li = document.createElement("li");
-    li.className = "activity-item";
-    li.style.cursor = "pointer";
+    li.className = "ps-history-item";
 
-    const left = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "activity-title";
-    title.textContent = entry.prompt.length > 60 ? entry.prompt.slice(0, 60) + "…" : entry.prompt;
-    const time = document.createElement("div");
-    time.className = "activity-time muted";
-    time.textContent = `${entry.result.rating} · ${timeAgo(entry.timestamp)}`;
-    left.append(title, time);
+    const marker = document.createElement("span");
+    marker.className = "ps-history-version";
+    marker.textContent = `v${entry.version}`;
 
-    const right = document.createElement("div");
-    right.className = "activity-savings";
-    right.textContent = entry.result.savedTokens > 0 ? `−${entry.result.savedTokens} tokens` : "—";
+    const body = document.createElement("div");
+    body.className = "ps-history-body";
 
-    li.append(left, right);
-    li.addEventListener("click", () => {
+    const prompt = document.createElement("p");
+    prompt.className = "ps-history-prompt";
+    prompt.textContent = entry.prompt.length > 90 ? entry.prompt.slice(0, 90) + "…" : entry.prompt;
+
+    const meta = document.createElement("div");
+    meta.className = "ps-history-meta";
+    const time = document.createElement("span");
+    time.textContent = timeAgo(entry.timestamp);
+    const changes = document.createElement("span");
+    changes.className = "ps-history-changes";
+    changes.textContent =
+      entry.result.savedTokens > 0
+        ? `${entry.result.rating} · saved ${entry.result.savedTokens} tokens`
+        : entry.result.rating;
+    meta.append(time, changes);
+
+    body.append(prompt, meta);
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className = "ps-history-restore";
+    restoreBtn.innerHTML = svgIcon(PS_RESTORE_ICON, "icon-sm") + "<span>Restore</span>";
+    restoreBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
       psInput.value = entry.prompt;
       psRenderResult(entry.result);
+      psInput.focus();
     });
+
+    li.append(marker, body, restoreBtn);
+    li.addEventListener("click", () => restoreBtn.click());
     return li;
   }
 
@@ -392,16 +635,22 @@
     }
   }
 
+  // Re-fetched every time the page is shown (not just on first load) so the
+  // context row stays accurate if the user links a project, comes back via
+  // the "Link a project" action above, then returns here.
+  async function psRefreshContext() {
+    const { activeProject } = await window.metriq.getCaptureContext();
+    psRenderContext(activeProject);
+  }
+
   async function initPromptStudio() {
     if (psInitialized) return;
     psInitialized = true;
 
-    const { activeProject } = await window.metriq.getCaptureContext();
-    psContext.textContent = activeProject
-      ? `Checking against ${activeProject.name}`
-      : "No project linked — link one from Projects for file-aware analysis.";
+    await psRefreshContext();
 
     psInput.addEventListener("input", () => {
+      psUpdateToolbar();
       clearTimeout(psDebounceTimer);
       const prompt = psInput.value.trim();
       if (!prompt) {
@@ -412,6 +661,12 @@
         const result = await window.metriq.analyzePrompt(prompt);
         psRenderResult(result);
       }, 350);
+    });
+
+    psBtnClear.addEventListener("click", () => {
+      psInput.value = "";
+      psClearResult();
+      psInput.focus();
     });
 
     psBtnCopy.addEventListener("click", async () => {
@@ -431,21 +686,10 @@
       }, 1200);
     });
 
-    psBtnSnapshot.addEventListener("click", () => {
-      if (!psLatestResult) return;
-      psHistory.push({
-        timestamp: new Date().toISOString(),
-        prompt: psInput.value.trim(),
-        result: psLatestResult,
-      });
-      psRefreshHistory();
-      const original = psBtnSnapshot.textContent;
-      psBtnSnapshot.textContent = "Saved!";
-      setTimeout(() => {
-        psBtnSnapshot.textContent = original;
-      }, 1200);
-    });
+    psBtnSnapshot.addEventListener("click", () => psSaveSnapshot(psBtnSnapshot));
+    psBtnSnapshotEmpty.addEventListener("click", () => psSaveSnapshot(psBtnSnapshotEmpty));
 
+    psUpdateToolbar();
     psRefreshHistory();
   }
 
@@ -468,7 +712,10 @@
     btn.addEventListener("click", () => {
       showPage(btn.dataset.page);
       if (btn.dataset.page === "usage") refreshUsage();
-      if (btn.dataset.page === "prompt-studio") initPromptStudio();
+      if (btn.dataset.page === "prompt-studio") {
+        initPromptStudio();
+        psRefreshContext();
+      }
     });
   }
 
@@ -477,9 +724,12 @@
   btnGotoStudio?.addEventListener("click", () => {
     showPage("prompt-studio");
     initPromptStudio();
+    psRefreshContext();
   });
 
   btnOvFirstPrompt?.addEventListener("click", () => window.metriq.openCapture());
+
+  btnGotoTools?.addEventListener("click", () => showPage("tools"));
 
   document.getElementById("btn-sidebar-avatar")?.addEventListener("click", () => showPage("settings"));
 
@@ -514,6 +764,9 @@
     showPage("overview");
     refreshProjects();
     initTools();
+    initFutureIntegrations();
+    initPresets();
+    renderOverviewTools();
     initAccessibility();
     refreshStats();
   }
@@ -575,40 +828,206 @@
       .join(isMac ? "" : "+");
   }
 
-  // --- Tools ------------------------------------------------------------
+  // --- Tools (Integration Hub) --------------------------------------------
+
+  const itgHeaderBadge = document.getElementById("itg-header-badge");
+  const itgFutureGrid = document.getElementById("itg-future-grid");
+
+  const ITG_STATUS_LABEL = { supported: "Supported", generic: "Generic" };
 
   async function initTools() {
+    if (itgHeaderBadge) itgHeaderBadge.textContent = `${AVAILABLE_TOOLS.length} platforms`;
+
     const selected = new Set(await window.metriq.getTools());
     toolsList.innerHTML = "";
     for (const tool of AVAILABLE_TOOLS) {
-      const row = document.createElement("label");
-      row.className = "tool-row" + (selected.has(tool.id) ? " is-checked" : "");
+      const isChecked = selected.has(tool.id);
+      const card = document.createElement("label");
+      card.className = "itg-tool-card" + (isChecked ? " is-checked" : "");
+
+      const top = document.createElement("div");
+      top.className = "itg-tool-card-top";
 
       const iconWrap = document.createElement("span");
-      iconWrap.className = "tool-row-icon";
-      iconWrap.innerHTML = svgIcon(TOOL_ICONS[tool.icon] || "");
-
-      const textWrap = document.createElement("span");
-      textWrap.className = "tool-row-label";
-      textWrap.textContent = tool.label;
+      iconWrap.className = "itg-tool-icon";
+      renderToolIcon(iconWrap, tool);
 
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.className = "tool-row-input";
-      checkbox.checked = selected.has(tool.id);
+      checkbox.checked = isChecked;
       checkbox.addEventListener("change", async () => {
         if (checkbox.checked) selected.add(tool.id);
         else selected.delete(tool.id);
-        row.classList.toggle("is-checked", checkbox.checked);
+        card.classList.toggle("is-checked", checkbox.checked);
         await window.metriq.setTools([...selected]);
+        renderOverviewTools();
+        renderPresetStates(selected); // a manual toggle can match/break a preset's exact combo
       });
 
       const toggle = document.createElement("span");
-      toggle.className = "tool-row-toggle";
+      toggle.className = "tool-row-toggle itg-tool-toggle";
 
-      row.append(iconWrap, textWrap, checkbox, toggle);
-      toolsList.append(row);
+      top.append(iconWrap, checkbox, toggle);
+
+      const name = document.createElement("div");
+      name.className = "itg-tool-name";
+      name.textContent = tool.label;
+
+      const desc = document.createElement("p");
+      desc.className = "itg-tool-desc";
+      desc.textContent = tool.description;
+
+      const badge = document.createElement("span");
+      badge.className = `itg-badge itg-badge-${tool.status}`;
+      badge.textContent = ITG_STATUS_LABEL[tool.status] || tool.status;
+
+      card.append(top, name, desc, badge);
+      toolsList.append(card);
     }
+  }
+
+  function initFutureIntegrations() {
+    if (!itgFutureGrid) return;
+    itgFutureGrid.innerHTML = "";
+    for (const tool of FUTURE_TOOLS) {
+      const card = document.createElement("div");
+      card.className = "itg-tool-card itg-tool-card-future";
+
+      const top = document.createElement("div");
+      top.className = "itg-tool-card-top";
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "itg-tool-icon";
+      renderToolIcon(iconWrap, tool);
+      top.append(iconWrap);
+
+      const name = document.createElement("div");
+      name.className = "itg-tool-name";
+      name.textContent = tool.label;
+
+      const desc = document.createElement("p");
+      desc.className = "itg-tool-desc";
+      desc.textContent = tool.description;
+
+      const badge = document.createElement("span");
+      badge.className = "itg-badge itg-badge-soon";
+      badge.textContent = "Coming soon";
+
+      card.append(top, name, desc, badge);
+      itgFutureGrid.append(card);
+    }
+  }
+
+  // --- Recommended setups --------------------------------------------------
+  // One-click presets over the real tool toggles above — Apply calls the
+  // exact same window.metriq.setTools() the cards themselves use, so this
+  // is a shortcut, not a preview: whatever isn't in the preset gets turned
+  // off, matching the "enable matching, disable the rest" spec.
+
+  const itgPresetGrid = document.getElementById("itg-preset-grid");
+
+  const ITG_PRESET_ICONS = {
+    laptop: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M2 20h20"/>',
+    flask: '<path d="M9 3h6M10 3v5.5L4.8 18a2 2 0 0 0 1.8 3h10.8a2 2 0 0 0 1.8-3L14 8.5V3"/>',
+    cap: '<path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12.5V17c0 1.1 2.7 3 6 3s6-1.9 6-3v-4.5"/>',
+    checklist: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/>',
+  };
+
+  const PRESETS = [
+    {
+      id: "engineer",
+      label: "Software Engineer",
+      icon: "laptop",
+      description: "Builds applications and writes code daily.",
+      tools: ["chatgpt", "vscode", "cursor"],
+    },
+    {
+      id: "researcher",
+      label: "AI Researcher",
+      icon: "flask",
+      description: "Optimized for experimentation, reasoning, and long-context prompts.",
+      tools: ["claude", "chatgpt"],
+    },
+    {
+      id: "student",
+      label: "Student",
+      icon: "cap",
+      description: "General learning, homework, and research assistance.",
+      tools: ["chatgpt", "claude"],
+    },
+    {
+      id: "productivity",
+      label: "General Productivity",
+      icon: "checklist",
+      description: "Everyday AI assistance for writing and organization.",
+      tools: ["chatgpt"],
+    },
+  ];
+
+  // A preset is "applied" when the current selection is exactly its tool
+  // set — not a superset/subset, an exact match — so the button's state
+  // always reflects reality instead of a self-timing "Applied!" flash that
+  // could go stale the moment something else changes the selection.
+  function presetIsActive(preset, selected) {
+    return preset.tools.length === selected.size && preset.tools.every((id) => selected.has(id));
+  }
+
+  function renderPresetStates(selected) {
+    if (!itgPresetGrid) return;
+    itgPresetGrid.innerHTML = "";
+    for (const preset of PRESETS) {
+      const isActive = presetIsActive(preset, selected);
+
+      const card = document.createElement("div");
+      card.className = "itg-preset-card" + (isActive ? " is-applied" : "");
+
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "itg-preset-icon";
+      iconWrap.innerHTML = svgIcon(ITG_PRESET_ICONS[preset.icon] || "");
+
+      const name = document.createElement("div");
+      name.className = "itg-preset-name";
+      name.textContent = preset.label;
+
+      const desc = document.createElement("p");
+      desc.className = "itg-preset-desc";
+      desc.textContent = preset.description;
+
+      const chips = document.createElement("div");
+      chips.className = "itg-preset-chips";
+      for (const toolId of preset.tools) {
+        const tool = AVAILABLE_TOOLS.find((t) => t.id === toolId);
+        if (!tool) continue;
+        const chip = document.createElement("span");
+        chip.className = "itg-preset-chip";
+        chip.textContent = tool.label;
+        chips.append(chip);
+      }
+
+      const applyBtn = document.createElement("button");
+      applyBtn.type = "button";
+      applyBtn.className = "itg-preset-apply" + (isActive ? " is-remove" : "");
+      applyBtn.textContent = isActive ? "Remove setup" : "Apply setup";
+      applyBtn.addEventListener("click", async () => {
+        applyBtn.disabled = true;
+        // Remove clears back to nothing selected rather than guessing at a
+        // "previous" state — same predictable behavior as unchecking every
+        // card by hand.
+        const nextTools = isActive ? [] : [...preset.tools];
+        await window.metriq.setTools(nextTools);
+        await initTools();
+        renderOverviewTools();
+        renderPresetStates(new Set(nextTools));
+      });
+
+      card.append(iconWrap, name, desc, chips, applyBtn);
+      itgPresetGrid.append(card);
+    }
+  }
+
+  async function initPresets() {
+    if (!itgPresetGrid) return;
+    renderPresetStates(new Set(await window.metriq.getTools()));
   }
 
   // --- Accessibility ------------------------------------------------------
@@ -797,13 +1216,25 @@
       const top = document.createElement("div");
       top.className = "project-item-top";
       const nameCol = document.createElement("div");
+      const nameRow = document.createElement("div");
+      nameRow.className = "project-name-row";
       const name = document.createElement("div");
       name.className = "project-name";
       name.textContent = project.name;
+      nameRow.append(name);
+      if (project.kind === "github") {
+        const badge = document.createElement("span");
+        badge.className = "project-kind-badge";
+        badge.textContent = "GitHub";
+        nameRow.append(badge);
+      }
       const pathEl = document.createElement("div");
       pathEl.className = "project-path";
-      pathEl.textContent = project.path;
-      nameCol.append(name, pathEl);
+      // A github project's real "path" is a Metriq-managed local clone
+      // directory — not meaningful to show the user; the repo it came from
+      // is what they'd recognize (name is always "owner/repo" for these).
+      pathEl.textContent = project.kind === "github" ? `github.com/${project.name}` : project.path;
+      nameCol.append(nameRow, pathEl);
       top.append(nameCol);
       li.append(top);
 
@@ -835,22 +1266,23 @@
         try {
           await window.metriq.rescanProject(project);
           clearProjectsError();
+          refreshProjects(); // only on success — refreshProjects()'s own
+          // clearProjectsError() would otherwise wipe out the error below
         } catch (err) {
           showProjectsError(err.message || "Rescan failed.");
         }
-        refreshProjects();
       });
 
       const removeBtn = document.createElement("button");
       removeBtn.textContent = "Remove";
       removeBtn.addEventListener("click", async () => {
         try {
-          await window.metriq.removeProject(project.id);
+          await window.metriq.removeProject(project);
           clearProjectsError();
+          refreshProjects();
         } catch (err) {
           showProjectsError(err.message || "Remove failed.");
         }
-        refreshProjects();
       });
 
       actions.append(activeBtn, rescanBtn, removeBtn);
@@ -979,16 +1411,70 @@
     try {
       await window.metriq.linkProject(folderPath);
       clearProjectsError();
+      refreshProjects(); // only on success — see the rescan/remove handlers
+      // for why this can't run unconditionally after both branches
     } catch (err) {
       showProjectsError(err.message || "Couldn't link that folder.");
       if (button !== btnLinkProject) showPage("projects");
     }
     button.innerHTML = originalLabel;
     button.disabled = false;
-    refreshProjects();
   }
 
-  btnLinkProject.addEventListener("click", () => linkProjectFlow(btnLinkProject));
+  btnLinkProject.addEventListener("click", () => {
+    githubLinkForm.classList.add("hidden");
+    linkProjectFlow(btnLinkProject);
+  });
+
+  // --- Link a GitHub repo (Projects page) -----------------------------------
+  // A real clone, not a stub: main.js shallow-clones the repo to a local,
+  // Metriq-managed directory and scans it exactly like a picked folder —
+  // see projects:link-github in desktop/src/main.js.
+
+  btnLinkGithub?.addEventListener("click", () => {
+    const opening = githubLinkForm.classList.contains("hidden");
+    githubLinkForm.classList.toggle("hidden", !opening);
+    if (opening) githubUrlInput.focus();
+  });
+
+  // The empty-state hero card's CTAs are the same actions as the header
+  // buttons, just re-triggered from a second location — not a second
+  // implementation of "link a project."
+  document.getElementById("btn-link-project-empty")?.addEventListener("click", (e) => {
+    githubLinkForm.classList.add("hidden");
+    linkProjectFlow(e.currentTarget);
+  });
+  document.getElementById("btn-link-github-empty")?.addEventListener("click", () => btnLinkGithub.click());
+
+  document.getElementById("btn-open-docs")?.addEventListener("click", () => window.metriq.openRepoDocs());
+
+  btnGithubCancel?.addEventListener("click", () => {
+    githubLinkForm.classList.add("hidden");
+    githubUrlInput.value = "";
+    clearProjectsError();
+  });
+
+  githubLinkForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = githubUrlInput.value.trim();
+    if (!url) return;
+    const submitBtn = document.getElementById("btn-github-submit");
+    const original = submitBtn.textContent;
+    submitBtn.textContent = "Linking…";
+    submitBtn.disabled = true;
+    try {
+      await window.metriq.linkGithubProject(url);
+      clearProjectsError();
+      githubLinkForm.classList.add("hidden");
+      githubUrlInput.value = "";
+      refreshProjects(); // only on success — see the rescan/remove handlers
+      // for why this can't run unconditionally after both branches
+    } catch (err) {
+      showProjectsError(err.message || "Couldn't link that repository.");
+    }
+    submitBtn.textContent = original;
+    submitBtn.disabled = false;
+  });
 
   // --- Usage stats (Overview / Sustainability) -----------------------------
 

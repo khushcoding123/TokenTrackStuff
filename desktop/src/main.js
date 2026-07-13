@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog, globalShortcut, clipboard, screen } = require("electron");
 const path = require("node:path");
+const fs = require("node:fs");
 const { execFile } = require("node:child_process");
 const { saveSession, loadSession, clearSession } = require("./auth-store");
 const { PROTOCOL, findProtocolUrlInArgv, parseAuthCallbackUrl } = require("./protocol");
@@ -29,7 +30,6 @@ const CAPTURE_HOTKEY = process.env.METRIQ_CAPTURE_HOTKEY || "CommandOrControl+Sh
 // and only when explicitly opted into. Never set in a real user's launch.
 if (process.env.METRIQ_E2E_TEST === "1") {
   const { credentialsPath } = require("./auth-store");
-  const fs = require("node:fs");
   global.__metriqTest = {
     saveSession,
     loadSession,
@@ -457,6 +457,13 @@ if (!gotSingleInstanceLock) {
 
   ipcMain.handle("app:get-capture-hotkey", () => CAPTURE_HOTKEY);
 
+  // Hardcoded destination only (not a renderer-supplied URL) — same
+  // shell.openExternal pattern as auth:open-login below, kept to a single
+  // fixed target so the renderer can never direct this to an arbitrary URL.
+  ipcMain.handle("app:open-repo-docs", () => {
+    shell.openExternal("https://github.com/khushcoding123/TokenTrackStuff");
+  });
+
   ipcMain.handle("auth:get-session", () => loadSession());
 
   ipcMain.handle("auth:open-login", () => {
@@ -545,6 +552,53 @@ if (!gotSingleInstanceLock) {
     return { files, scannedAt: new Date().toISOString() };
   }
 
+  // Accepts a full GitHub URL (https://github.com/owner/repo, with or
+  // without .git/trailing slash), an SSH remote (git@github.com:owner/repo),
+  // or the bare "owner/repo" shorthand. Returns null (not a thrown error)
+  // for anything that doesn't parse, so the caller can give one consistent
+  // "that doesn't look like a GitHub repo" message.
+  function parseGithubRepo(input) {
+    const trimmed = String(input || "").trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.replace(/^git@github\.com:/, "github.com/").replace(/^https?:\/\//, "").replace(/^www\./, "");
+    const withDomain = normalized.match(/^github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/);
+    const shorthand = !withDomain && trimmed.match(/^([\w.-]+)\/([\w.-]+?)(?:\.git)?$/);
+    const match = withDomain || shorthand;
+    if (!match) return null;
+    const [, owner, repo] = match;
+    return { owner, repo, cloneUrl: `https://github.com/${owner}/${repo}.git` };
+  }
+
+  function repoCloneDir(owner, repo) {
+    return path.join(app.getPath("userData"), "repo-clones", `${owner}__${repo}`);
+  }
+
+  // Fresh shallow clone every time (link *and* rescan) rather than an
+  // incremental `git pull` — avoids ever having to reconcile a diverged or
+  // force-pushed local working tree, at the cost of always re-fetching. For
+  // the shallow depth used here that's a small, predictable cost.
+  function cloneGithubRepo(owner, repo) {
+    const dir = repoCloneDir(owner, repo);
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(dir), { recursive: true });
+    return new Promise((resolve, reject) => {
+      execFile(
+        "git",
+        ["clone", "--depth", "1", `https://github.com/${owner}/${repo}.git`, dir],
+        { timeout: 60_000 },
+        (err) => {
+          if (!err) return resolve(dir);
+          fs.rmSync(dir, { recursive: true, force: true });
+          if (err.code === "ENOENT") {
+            reject(new Error("Git isn't installed on this machine — needed to clone repos."));
+          } else {
+            reject(new Error("Couldn't clone that repository — check the URL and that it's public."));
+          }
+        }
+      );
+    });
+  }
+
   ipcMain.handle("projects:pick-folder", async () => {
     const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
       properties: ["openDirectory", "createDirectory"],
@@ -571,11 +625,52 @@ if (!gotSingleInstanceLock) {
     return project;
   });
 
+  // Mirrors projects:link, but the "folder" is a fresh shallow clone of a
+  // GitHub repo instead of a user-picked directory — everything downstream
+  // (scanning, findRelevantFiles, rescan) treats it identically from here
+  // on, since it's still just a real local directory on disk.
+  ipcMain.handle("projects:link-github", async (_event, repoUrl) => {
+    const parsed = parseGithubRepo(repoUrl);
+    if (!parsed) {
+      throw new Error("That doesn't look like a GitHub repo URL — try https://github.com/owner/repo.");
+    }
+    const { owner, repo } = parsed;
+    const cloneDir = await cloneGithubRepo(owner, repo);
+    const { files, scannedAt } = scanFolder(cloneDir);
+    const name = `${owner}/${repo}`;
+
+    let project;
+    try {
+      project = await withAuthRetry((token) =>
+        insforge.createLinkedProject(token, {
+          name,
+          path: cloneDir,
+          kind: "github",
+          fileCount: files.length,
+        })
+      );
+    } catch (err) {
+      // Without a DB row nothing will ever reference this clone again —
+      // clean it up rather than leaving a dangling directory behind.
+      fs.rmSync(cloneDir, { recursive: true, force: true });
+      throw err;
+    }
+
+    saveFileIndex(project.id, { files, scannedAt });
+    savePrefs({ activeProject: { id: project.id, name: project.name, path: project.path } });
+    return project;
+  });
+
   ipcMain.handle("projects:list", async () => {
     return withAuthRetry((token) => insforge.listLinkedProjects(token));
   });
 
   ipcMain.handle("projects:rescan", async (_event, project) => {
+    if (project.kind === "github") {
+      const parsed = parseGithubRepo(project.name); // name is always "owner/repo" for github projects
+      if (!parsed) throw new Error("Can't determine the source repo to rescan.");
+      await cloneGithubRepo(parsed.owner, parsed.repo);
+    }
     const { files, scannedAt } = scanFolder(project.path);
     saveFileIndex(project.id, { files, scannedAt });
     return withAuthRetry((token) =>
@@ -586,9 +681,15 @@ if (!gotSingleInstanceLock) {
     );
   });
 
-  ipcMain.handle("projects:remove", async (_event, projectId) => {
+  ipcMain.handle("projects:remove", async (_event, project) => {
+    const projectId = project.id;
     await withAuthRetry((token) => insforge.deleteLinkedProject(token, projectId));
     removeFileIndex(projectId);
+    // Only a github-kind project has a Metriq-managed clone on disk worth
+    // cleaning up — a local-kind project's path is the user's own folder.
+    if (project.kind === "github" && project.path) {
+      fs.rmSync(project.path, { recursive: true, force: true });
+    }
     const prefs = loadPrefs();
     if (prefs.activeProject?.id === projectId) {
       savePrefs({ activeProject: null });

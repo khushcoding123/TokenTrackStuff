@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("metriqInitial", ipcRenderer.sendSync("prefs:get
 
 contextBridge.exposeInMainWorld("metriq", {
   getCaptureHotkey: () => ipcRenderer.invoke("app:get-capture-hotkey"),
+  openRepoDocs: () => ipcRenderer.invoke("app:open-repo-docs"),
 
   getSession: () => ipcRenderer.invoke("auth:get-session"),
   openLogin: () => ipcRenderer.invoke("auth:open-login"),
@@ -37,9 +38,10 @@ contextBridge.exposeInMainWorld("metriq", {
 
   pickFolder: () => ipcRenderer.invoke("projects:pick-folder"),
   linkProject: (folderPath) => ipcRenderer.invoke("projects:link", folderPath),
+  linkGithubProject: (repoUrl) => ipcRenderer.invoke("projects:link-github", repoUrl),
   listProjects: () => ipcRenderer.invoke("projects:list"),
   rescanProject: (project) => ipcRenderer.invoke("projects:rescan", project),
-  removeProject: (projectId) => ipcRenderer.invoke("projects:remove", projectId),
+  removeProject: (project) => ipcRenderer.invoke("projects:remove", project),
   setActiveProject: (project) => ipcRenderer.invoke("projects:set-active", project),
   getActiveProjectId: () => ipcRenderer.invoke("projects:get-active-id"),
   getActiveProject: () => ipcRenderer.invoke("projects:get-active-project"),

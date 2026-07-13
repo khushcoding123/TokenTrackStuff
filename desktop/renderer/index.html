@@ -221,28 +221,58 @@
                   </div>
                   <div id="ov-insights" class="ov-panel-body ov-insights"></div>
                 </section>
+
+                <section class="ov-panel" aria-labelledby="ov-tools-title">
+                  <div class="ov-panel-header">
+                    <h2 id="ov-tools-title" class="ov-panel-title">Your tools</h2>
+                    <button id="btn-goto-tools" class="link-btn">Manage</button>
+                  </div>
+                  <div id="ov-tools-quick" class="ov-panel-body"></div>
+                </section>
               </aside>
             </div>
           </section>
 
           <!-- Prompt Studio -->
           <section id="page-prompt-studio" class="page hidden">
-            <h1 class="page-title">Prompt Studio</h1>
-            <p class="muted page-subtitle">
-              Draft a prompt and see exactly how it'll be analyzed before you send it to Claude, ChatGPT, Cursor, or
-              VS Code.
-            </p>
+            <header class="ps-header">
+              <div>
+                <h1 class="page-title">Prompt Studio</h1>
+                <p class="muted page-subtitle">
+                  Write, refine, and analyze prompts before sending them to your preferred AI model.
+                </p>
+              </div>
+              <span id="ps-header-badge" class="capture-badge ps-header-badge">Ready</span>
+            </header>
 
-            <div id="ps-context" class="ps-context muted"></div>
+            <div class="ps-editor-card">
+              <div id="ps-context" class="ps-context-row"></div>
 
-            <textarea
-              id="ps-input"
-              class="ps-input"
-              rows="6"
-              placeholder="Paste or write the prompt you're about to send..."
-            ></textarea>
+              <textarea
+                id="ps-input"
+                class="ps-input"
+                placeholder="Describe what you'd like your AI assistant to accomplish&#10;&#10;Create a React dashboard for...&#10;Explain this code...&#10;Optimize this SQL query..."
+              ></textarea>
 
-            <p id="ps-empty-hint" class="muted ps-empty-hint">Start typing to see live analysis.</p>
+              <div class="ps-toolbar">
+                <div class="ps-toolbar-meta">
+                  <span id="ps-char-count" class="ps-toolbar-stat">0 characters</span>
+                  <span class="ps-toolbar-divider" aria-hidden="true"></span>
+                  <span id="ps-token-estimate" class="ps-toolbar-stat">— tokens</span>
+                </div>
+                <button id="ps-btn-clear" class="link-btn" type="button">Clear</button>
+              </div>
+            </div>
+
+            <div id="ps-status-banner" class="alert ps-status-banner" data-variant="info">
+              <svg class="icon icon-sm alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5M12 8h.01" />
+              </svg>
+              <p class="alert-message">
+                <strong>Live analysis ready.</strong> We'll start analyzing your prompt as soon as you start typing.
+              </p>
+            </div>
 
             <div id="ps-results" class="hidden">
               <div class="ps-score-row">
@@ -271,43 +301,136 @@
                   <button id="ps-btn-copy" class="link-btn">Copy</button>
                 </div>
                 <p id="ps-focused" class="ps-focused"></p>
-                <button id="ps-btn-snapshot" class="pill-action ps-snapshot-btn">Save this revision</button>
+                <button id="ps-btn-snapshot" class="pill-action ps-snapshot-btn">Save snapshot</button>
               </div>
             </div>
 
-            <div class="section-block">
+            <div class="section-block ps-history-block">
               <div class="section-header">
                 <h2>Revision history</h2>
               </div>
-              <ul id="ps-history-list" class="activity-list"></ul>
-              <p id="ps-history-empty" class="muted empty-note">Saved revisions from this session will show up here.</p>
+
+              <ol id="ps-history-list" class="ps-history-list"></ol>
+
+              <div id="ps-history-empty" class="empty-state">
+                <div class="empty-state-icon-frame">
+                  <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 3-6.7" />
+                    <path d="M3 3v5h5" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                </div>
+                <p class="empty-state-title">No revisions yet</p>
+                <p class="muted">Every saved version of your prompt will appear here.</p>
+                <button id="ps-btn-snapshot-empty" class="pill-action" type="button">Save snapshot</button>
+              </div>
             </div>
           </section>
 
           <!-- Projects -->
-          <section id="page-projects" class="page hidden">
-            <div class="page-header-row">
-              <h1 class="page-title">Projects</h1>
-              <button id="btn-link-project" class="pill-action">
-                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Link a project
-              </button>
-            </div>
-            <p class="muted page-subtitle">
-              Local folders Metriq scans so it can check your prompts against real files.
-            </p>
-            <div id="projects-error" class="alert hidden"></div>
-            <ul id="projects-list" class="projects-list"></ul>
-            <div id="projects-empty" class="empty-state hidden">
-              <div class="empty-state-icon-frame">
-                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-                </svg>
+          <section id="page-projects" class="page hidden proj-page">
+            <header class="proj-header">
+              <div class="proj-header-text">
+                <h1 class="page-title">Projects</h1>
+                <p class="muted page-subtitle">Manage the repositories available to your AI assistant.</p>
               </div>
-              <p class="empty-state-title">No projects linked</p>
-              <p class="muted">Link a local folder so Metriq can check your prompts against real files.</p>
+              <div class="proj-header-actions">
+                <button id="btn-link-project" class="proj-btn-primary">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Link Folder
+                </button>
+                <button id="btn-link-github" class="proj-btn-secondary">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="9" r="5" />
+                    <path d="M7 13v3a2 2 0 0 0 2 2M17 13v3a2 2 0 0 1-2 2M9 9h.01M15 9h.01M6 20l1.5-2M18 20l-1.5-2" />
+                  </svg>
+                  Import GitHub
+                </button>
+              </div>
+            </header>
+
+            <form id="github-link-form" class="github-link-form hidden">
+              <input
+                id="github-url-input"
+                class="github-url-input"
+                type="text"
+                placeholder="https://github.com/owner/repo"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="submit" id="btn-github-submit" class="proj-btn-primary proj-btn-compact">Link</button>
+              <button type="button" id="btn-github-cancel" class="link-btn">Cancel</button>
+            </form>
+
+            <div id="projects-error" class="alert hidden"></div>
+
+            <ul id="projects-list" class="projects-list"></ul>
+
+            <div id="projects-empty" class="proj-empty hidden">
+              <div class="proj-empty-card">
+                <div class="proj-empty-illustration" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" fill="none">
+                    <path
+                      d="M14 20a4 4 0 0 1 4-4h9l4 5h15a4 4 0 0 1 4 4v19a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V20Z"
+                      stroke="var(--accent-primary)"
+                      stroke-width="2"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M32 30v12M26 36h12" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <h2 class="proj-empty-title">Welcome to Projects</h2>
+                <p class="proj-empty-desc">
+                  Link a local folder or GitHub repository to allow the AI to understand your codebase.
+                </p>
+                <div class="proj-empty-actions">
+                  <button id="btn-link-project-empty" class="proj-btn-primary">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Link Folder
+                  </button>
+                  <button id="btn-link-github-empty" class="proj-btn-secondary">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="9" r="5" />
+                      <path d="M7 13v3a2 2 0 0 0 2 2M17 13v3a2 2 0 0 1-2 2M9 9h.01M15 9h.01M6 20l1.5-2M18 20l-1.5-2" />
+                    </svg>
+                    Import GitHub Repository
+                  </button>
+                </div>
+              </div>
+
+              <div class="proj-capabilities">
+                <h3 class="proj-capabilities-title">What you can do</h3>
+                <ul class="proj-capabilities-list">
+                  <li>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5" /></svg>
+                    Ask questions about your code
+                  </li>
+                  <li>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5" /></svg>
+                    Search across files instantly
+                  </li>
+                  <li>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5" /></svg>
+                    Generate implementations
+                  </li>
+                  <li>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5" /></svg>
+                    Detect bugs
+                  </li>
+                  <li>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5" /></svg>
+                    Review architecture
+                  </li>
+                </ul>
+              </div>
+
+              <div class="proj-empty-footer">
+                <button id="btn-open-docs" class="link-btn">Documentation</button>
+              </div>
             </div>
           </section>
 
@@ -374,9 +497,40 @@
 
           <!-- Tools -->
           <section id="page-tools" class="page hidden">
-            <h1 class="page-title">Tools you use</h1>
-            <p class="muted page-subtitle">Used to frame feedback — no live integration yet.</p>
-            <div id="tools-list" class="tools-list"></div>
+            <header class="itg-header">
+              <div>
+                <h1 class="page-title">Tools you use</h1>
+                <p class="muted page-subtitle">
+                  Select the AI platforms you regularly reach for so Metriq can tailor its feedback wording and
+                  suggestions to each one.
+                </p>
+              </div>
+              <span id="itg-header-badge" class="capture-badge itg-header-badge"></span>
+            </header>
+
+            <section class="itg-section">
+              <div class="itg-section-header">
+                <h2>Supported AI tools</h2>
+                <p class="muted">Toggle the ones you use — selected tools shape how feedback is framed.</p>
+              </div>
+              <div id="tools-list" class="itg-tool-grid"></div>
+            </section>
+
+            <section class="itg-section">
+              <div class="itg-section-header">
+                <h2>Recommended setups</h2>
+                <p class="muted">One-click presets for common workflows — applies real toggles above, no confirmation needed.</p>
+              </div>
+              <div id="itg-preset-grid" class="itg-preset-grid"></div>
+            </section>
+
+            <section class="itg-section">
+              <div class="itg-section-header">
+                <h2>Future integrations</h2>
+                <p class="muted">Not wired up yet — on the roadmap.</p>
+              </div>
+              <div id="itg-future-grid" class="itg-tool-grid itg-tool-grid-future"></div>
+            </section>
           </section>
 
           <!-- Sustainability -->
