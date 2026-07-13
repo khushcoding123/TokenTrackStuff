@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Metriq — Prompt Optimizer",
+  "version": "0.1.0",
+  "description": "Reads the prompt you're typing in ChatGPT, Claude, Gemini or Perplexity and rewrites it into a focused one — so you burn fewer tokens and hit usage limits less often.",
+  "icons": { "128": "icons/icon-128.png" },
+  "action": {
+    "default_title": "Metriq — click the ✦ button on the page to optimize your prompt"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["engine/*.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*"
+      ]
+    }
+  ]
+}
