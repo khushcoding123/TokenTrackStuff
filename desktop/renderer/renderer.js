@@ -18,6 +18,13 @@
   const overviewActiveProject = document.getElementById("overview-active-project");
   const recentActivityList = document.getElementById("recent-activity-list");
   const recentActivityEmpty = document.getElementById("recent-activity-empty");
+  const ovDate = document.getElementById("ov-date");
+  const ovHeroName = document.getElementById("ov-hero-name");
+  const ovStatAvgPct = document.getElementById("ov-stat-avg-pct");
+  const ovStatProjects = document.getElementById("ov-stat-projects");
+  const ovInsights = document.getElementById("ov-insights");
+  const btnGotoStudio = document.getElementById("btn-goto-studio");
+  const btnOvFirstPrompt = document.getElementById("btn-ov-first-prompt");
 
   const AVAILABLE_TOOLS = [
     { id: "claude", label: "Claude", icon: "sparkle" },
@@ -42,6 +49,146 @@
 
   function svgIcon(pathMarkup, extraClass = "") {
     return `<svg class="icon ${extraClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${pathMarkup}</svg>`;
+  }
+
+  // --- Overview (home) -----------------------------------------------------
+  // The redesigned front-door page: hero greeting, metric row with a one-time
+  // count-up, active-project summary, activity timeline, and a suggestions
+  // panel derived deterministically from local state (no network, no LLM).
+
+  const OV_ICON_PATHS = {
+    zap: '<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+    folderPlus:
+      '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M12 10v6M9 13h6"/>',
+    lightbulb:
+      '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 1 3.4 10.9c-.5.4-.9 1.1-1.1 2.1H9.7c-.2-1-.6-1.7-1.1-2.1A6 6 0 0 1 12 3Z"/>',
+    shield: '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/>',
+    trendingUp: '<path d="m3 17 6-6 4 4 7-7"/><path d="M14 8h6v6"/>',
+    chevronRight: '<path d="m9 6 6 6-6 6"/>',
+  };
+
+  if (ovDate) {
+    ovDate.textContent = new Date().toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  // Insights need both the capture summary and the projects list; each
+  // refresh path stores its half here and re-renders.
+  let ovSummary = null;
+  let ovProjectCount = null;
+
+  // One-time count-up per metric element on first paint; later refreshes set
+  // the value directly (re-animating on every sync reads as glitchy, not
+  // polished). Respects both the OS reduced-motion preference and the app's
+  // own Reduce Motion setting — the CSS blanket guard can't reach JS loops.
+  const ovAnimatedEls = new WeakSet();
+  const ovMetricAnims = new WeakMap();
+
+  function setMetricValue(el, value, format) {
+    if (!el) return;
+    const prev = ovMetricAnims.get(el);
+    if (prev) prev.cancelled = true;
+
+    const reduceMotion =
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      document.documentElement.classList.contains("reduce-motion");
+    const firstPaint = !ovAnimatedEls.has(el);
+    ovAnimatedEls.add(el);
+
+    if (!firstPaint || reduceMotion || !(value > 0)) {
+      el.textContent = format(value);
+      return;
+    }
+
+    const state = { cancelled: false };
+    ovMetricAnims.set(el, state);
+    const duration = 600;
+    const start = performance.now();
+    function tick(now) {
+      if (state.cancelled) return;
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+      el.textContent = format(Math.round(value * eased));
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function renderOverviewInsights() {
+    if (!ovInsights) return;
+    const suggestions = [];
+
+    if (ovProjectCount === 0) {
+      suggestions.push({
+        icon: "folderPlus",
+        title: "Connect a project",
+        desc: "Link a local folder so prompt checks can point at real files instead of guessing.",
+        go: () => showPage("projects"),
+      });
+    }
+    if (ovSummary && ovSummary.totalCaptures === 0) {
+      suggestions.push({
+        icon: "zap",
+        title: "Analyze your first prompt",
+        desc: "Run a prompt through Metriq before sending it to Claude, ChatGPT, or Cursor.",
+        go: () => window.metriq.openCapture(),
+      });
+    }
+    if (ovSummary && ovSummary.totalCaptures > 0 && ovSummary.avgSavedPct > 0) {
+      suggestions.push({
+        icon: "trendingUp",
+        title: `Saving ~${ovSummary.avgSavedPct}% per prompt`,
+        desc: "Focused rewrites are trimming your exploration cost — keep it up.",
+        positive: true,
+      });
+    }
+    suggestions.push(
+      {
+        icon: "lightbulb",
+        title: "Name real files in prompts",
+        desc: "A concrete file reference bounds how far the AI explores — the single biggest token saver.",
+      },
+      {
+        icon: "shield",
+        title: "Add a scope guard",
+        desc: 'Saying what not to touch ("only change X") keeps the model from wandering the repo.',
+      }
+    );
+
+    ovInsights.innerHTML = "";
+    for (const s of suggestions.slice(0, 4)) {
+      const row = document.createElement(s.go ? "button" : "div");
+      row.className = "ov-insight" + (s.positive ? " is-positive" : "");
+      if (s.go) row.type = "button";
+
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "ov-insight-icon";
+      iconWrap.innerHTML = svgIcon(OV_ICON_PATHS[s.icon] || OV_ICON_PATHS.lightbulb);
+
+      const text = document.createElement("span");
+      text.className = "ov-insight-text";
+      const title = document.createElement("span");
+      title.className = "ov-insight-title";
+      title.textContent = s.title;
+      const desc = document.createElement("span");
+      desc.className = "ov-insight-desc";
+      desc.textContent = s.desc;
+      text.append(title, desc);
+
+      row.append(iconWrap, text);
+      if (s.go) {
+        const chevron = document.createElement("span");
+        chevron.className = "ov-insight-chevron";
+        chevron.innerHTML = svgIcon(OV_ICON_PATHS.chevronRight);
+        row.append(chevron);
+        row.addEventListener("click", s.go);
+      }
+      ovInsights.append(row);
+    }
   }
 
   // --- Semantic alert (replaces raw error-text paragraphs) -----------------
@@ -327,6 +474,13 @@
 
   btnGotoProjects?.addEventListener("click", () => showPage("projects"));
 
+  btnGotoStudio?.addEventListener("click", () => {
+    showPage("prompt-studio");
+    initPromptStudio();
+  });
+
+  btnOvFirstPrompt?.addEventListener("click", () => window.metriq.openCapture());
+
   document.getElementById("btn-sidebar-avatar")?.addEventListener("click", () => showPage("settings"));
 
   // --- Auth views -----------------------------------------------------------
@@ -339,6 +493,11 @@
 
   function applyIdentity(session) {
     const displayName = session.name || session.email || "there";
+    if (ovHeroName) {
+      // First name if we have one, else the email's local part — ", Malhar"
+      const first = (session.name || "").trim().split(/\s+/)[0] || (session.email || "").split("@")[0];
+      ovHeroName.textContent = first ? `, ${first}` : "";
+    }
     document.getElementById("avatar-initial").textContent = displayName.charAt(0).toUpperCase();
     const sidebarAvatar = document.getElementById("btn-sidebar-avatar");
     if (sidebarAvatar) sidebarAvatar.title = `Signed in as ${displayName}`;
@@ -559,30 +718,71 @@
     setAlert(projectsError, "");
   }
 
-  function renderOverviewActiveProject(activeProject) {
+  function renderOverviewActiveProject(activeProject, projects = []) {
+    if (!overviewActiveProject) return;
+    overviewActiveProject.innerHTML = "";
+
     if (!activeProject) {
-      overviewActiveProject.innerHTML = `
-        <div class="empty-state-compact">
-          <div class="empty-state-icon-frame">
-            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-            </svg>
-          </div>
-          <p class="muted">No project linked yet.</p>
-        </div>
+      const empty = document.createElement("div");
+      empty.className = "ov-empty";
+      empty.innerHTML = `
+        <div class="ov-empty-icon">${svgIcon(OV_ICON_PATHS.folderPlus)}</div>
+        <p class="ov-empty-title">No project connected</p>
+        <p class="ov-empty-desc">Link a local folder and Metriq will check every prompt against your real files.</p>
       `;
+      const connectBtn = document.createElement("button");
+      connectBtn.type = "button";
+      connectBtn.className = "ov-btn-secondary";
+      connectBtn.textContent = "Connect a project";
+      connectBtn.addEventListener("click", () => linkProjectFlow(connectBtn));
+      empty.append(connectBtn);
+      overviewActiveProject.append(empty);
       return;
     }
-    overviewActiveProject.innerHTML = "";
+
+    // The active-project pref stores only {id, name, path}; file count and
+    // scan time live on the full record in the projects list.
+    const record = projects.find((p) => p.id === activeProject.id);
+
     const card = document.createElement("div");
-    card.className = "mini-project-card";
+    card.className = "ov-project";
+
+    const iconWrap = document.createElement("span");
+    iconWrap.className = "ov-project-icon";
+    iconWrap.innerHTML = svgIcon(OV_ICON_PATHS.folder);
+
+    const info = document.createElement("div");
+    info.className = "ov-project-info";
     const name = document.createElement("div");
-    name.className = "project-name";
+    name.className = "ov-project-name";
     name.textContent = activeProject.name;
     const pathEl = document.createElement("div");
-    pathEl.className = "project-path";
+    pathEl.className = "ov-project-path";
     pathEl.textContent = activeProject.path;
-    card.append(name, pathEl);
+    info.append(name, pathEl);
+
+    const meta = document.createElement("div");
+    meta.className = "ov-project-meta";
+    const activeChip = document.createElement("span");
+    activeChip.className = "ov-chip ov-chip-accent";
+    activeChip.textContent = "Active";
+    meta.append(activeChip);
+    if (record) {
+      const count = record.file_count ?? 0;
+      const filesChip = document.createElement("span");
+      filesChip.className = "ov-chip";
+      filesChip.textContent = `${count.toLocaleString()} file${count === 1 ? "" : "s"} indexed`;
+      meta.append(filesChip);
+      if (record.last_scanned_at) {
+        const scannedChip = document.createElement("span");
+        scannedChip.className = "ov-chip";
+        scannedChip.textContent = `scanned ${timeAgo(record.last_scanned_at)}`;
+        meta.append(scannedChip);
+      }
+    }
+    info.append(meta);
+
+    card.append(iconWrap, info);
     overviewActiveProject.append(card);
   }
 
@@ -660,18 +860,28 @@
   }
 
   async function refreshProjects() {
+    // Active-project selection is a local pref and can't realistically fail —
+    // resolve it first so the Overview panel renders even when the synced
+    // projects list below can't be fetched (offline, expired token, …).
+    const [activeId, activeProject] = await Promise.all([
+      window.metriq.getActiveProjectId(),
+      window.metriq.getActiveProject(),
+    ]);
+
+    let projects = [];
     try {
-      const [projects, activeId, activeProject] = await Promise.all([
-        window.metriq.listProjects(),
-        window.metriq.getActiveProjectId(),
-        window.metriq.getActiveProject(),
-      ]);
+      projects = (await window.metriq.listProjects()) || [];
       clearProjectsError();
-      renderProjects(projects || [], activeId);
-      renderOverviewActiveProject(activeProject);
+      renderProjects(projects, activeId);
+      ovProjectCount = projects.length;
+      setMetricValue(ovStatProjects, ovProjectCount, (n) => String(n));
     } catch (err) {
       showProjectsError(err.message || "Couldn't load projects.");
+      // ovProjectCount stays null: unknown, so insights don't claim "none".
     }
+
+    renderOverviewActiveProject(activeProject, projects);
+    renderOverviewInsights();
   }
 
   btnLogin.addEventListener("click", async () => {
@@ -756,22 +966,29 @@
 
   initAutoCapture();
 
-  btnLinkProject.addEventListener("click", async () => {
+  // Shared by the Projects page's "Link a project" button and the Overview
+  // empty state's "Connect a project" CTA. Errors render in the Projects
+  // page's alert, so a failure from Overview also navigates there — the
+  // message would otherwise be invisible.
+  async function linkProjectFlow(button) {
     const folderPath = await window.metriq.pickFolder();
     if (!folderPath) return;
-    const originalLabel = btnLinkProject.innerHTML;
-    btnLinkProject.textContent = "Linking…";
-    btnLinkProject.disabled = true;
+    const originalLabel = button.innerHTML;
+    button.textContent = "Linking…";
+    button.disabled = true;
     try {
       await window.metriq.linkProject(folderPath);
       clearProjectsError();
     } catch (err) {
       showProjectsError(err.message || "Couldn't link that folder.");
+      if (button !== btnLinkProject) showPage("projects");
     }
-    btnLinkProject.innerHTML = originalLabel;
-    btnLinkProject.disabled = false;
+    button.innerHTML = originalLabel;
+    button.disabled = false;
     refreshProjects();
-  });
+  }
+
+  btnLinkProject.addEventListener("click", () => linkProjectFlow(btnLinkProject));
 
   // --- Usage stats (Overview / Sustainability) -----------------------------
 
@@ -806,11 +1023,48 @@
     return li;
   }
 
+  // Overview's timeline row — icon node + action + timestamp, joined by the
+  // CSS connector line. Distinct from the flat .activity-item rows the
+  // Impact/Usage/Prompt Studio lists keep using (renderActivityRow below).
+  function renderOverviewActivityRow(entry) {
+    const li = document.createElement("li");
+    li.className = "ov-timeline-item";
+
+    const node = document.createElement("span");
+    node.className = "ov-timeline-node";
+    node.innerHTML = svgIcon(OV_ICON_PATHS.zap);
+
+    const body = document.createElement("div");
+    body.className = "ov-timeline-body";
+    const title = document.createElement("div");
+    title.className = "ov-timeline-title";
+    title.textContent = entry.projectName ? `Checked a prompt · ${entry.projectName}` : "Checked a prompt";
+    const time = document.createElement("div");
+    time.className = "ov-timeline-time";
+    time.textContent = timeAgo(entry.timestamp);
+    body.append(title, time);
+
+    const savings = document.createElement("span");
+    savings.className = "ov-timeline-savings";
+    if (entry.savedTokens > 0) {
+      savings.textContent = `−${entry.savedTokens.toLocaleString()} tokens`;
+    } else {
+      savings.textContent = "—";
+      savings.classList.add("is-flat");
+    }
+
+    li.append(node, body, savings);
+    return li;
+  }
+
   async function refreshStats() {
     const summary = await window.metriq.getStatsSummary();
 
-    document.getElementById("stat-captures").textContent = summary.totalCaptures;
-    document.getElementById("stat-tokens-saved").textContent = summary.totalSavedTokens.toLocaleString();
+    setMetricValue(document.getElementById("stat-captures"), summary.totalCaptures, (n) => String(n));
+    setMetricValue(document.getElementById("stat-tokens-saved"), summary.totalSavedTokens, (n) =>
+      n.toLocaleString()
+    );
+    setMetricValue(ovStatAvgPct, summary.avgSavedPct, (n) => `${n}%`);
     document.getElementById("sustain-captures").textContent = summary.totalCaptures;
     document.getElementById("sustain-tokens-saved").textContent = summary.totalSavedTokens.toLocaleString();
     document.getElementById("sustain-avg-pct").textContent = `${summary.avgSavedPct}%`;
@@ -819,8 +1073,11 @@
     const hasHistory = summary.recent.length > 0;
     recentActivityEmpty.classList.toggle("hidden", hasHistory);
     for (const entry of summary.recent.slice(0, 5)) {
-      recentActivityList.append(renderActivityRow(entry));
+      recentActivityList.append(renderOverviewActivityRow(entry));
     }
+
+    ovSummary = summary;
+    renderOverviewInsights();
 
     const sustainEmpty = document.getElementById("sustain-empty");
     const sustainHistoryBlock = document.getElementById("sustain-history-block");

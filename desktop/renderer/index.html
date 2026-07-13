@@ -95,62 +95,133 @@
         <div class="page-content">
           <!-- Overview -->
           <section id="page-overview" class="page">
-            <h1 class="page-title">Overview</h1>
-
-            <button id="btn-open-capture" class="command-trigger">
-              <span class="command-trigger-icon">
-                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
-                </svg>
-              </span>
-              <span class="command-trigger-text">
-                <span class="command-trigger-title">Check a prompt</span>
-                <span class="command-trigger-subtitle">Analyze it against your linked project before you send it</span>
-              </span>
-              <span id="capture-hotkey-label" class="capture-hotkey-label"></span>
-            </button>
-
-            <div class="stat-grid">
-              <div class="stat-card">
-                <span class="stat-value" id="stat-captures">0</span>
-                <span class="stat-label">Prompts checked</span>
-              </div>
-              <div class="stat-card stat-card-accent">
-                <span class="stat-value" id="stat-tokens-saved">0</span>
-                <span class="stat-label">Tokens saved</span>
-              </div>
-            </div>
-
-            <div class="section-block">
-              <div class="section-header">
-                <h2>Active project</h2>
-                <button id="btn-goto-projects" class="link-btn">Manage</button>
-              </div>
-              <div id="overview-active-project" class="active-project-card">
-                <div class="empty-state-compact">
-                  <div class="empty-state-icon-frame">
-                    <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-                    </svg>
-                  </div>
-                  <p class="muted">No project linked yet.</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="section-block">
-              <div class="section-header">
-                <h2>Recent activity</h2>
-              </div>
-              <ul id="recent-activity-list" class="activity-list"></ul>
-              <div id="recent-activity-empty" class="empty-state-compact">
-                <div class="empty-state-icon-frame">
-                  <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Hero: the page's focal point — greeting, one-line pitch, and
+                 the app's two entry actions. Same IPC wiring as before
+                 (btn-open-capture / capture-hotkey-label ids unchanged). -->
+            <header class="ov-hero">
+              <p id="ov-date" class="ov-hero-eyebrow"></p>
+              <h1 class="ov-hero-title">Welcome back<span id="ov-hero-name"></span></h1>
+              <p class="ov-hero-sub">
+                Analyze prompts against your real codebase, track the tokens you save, and keep your AI coding
+                workflow focused.
+              </p>
+              <div class="ov-hero-actions">
+                <button id="btn-open-capture" class="ov-btn-primary">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
                   </svg>
-                </div>
-                <p class="muted">Nothing yet — check a prompt to see it here.</p>
+                  Analyze prompt
+                  <span id="capture-hotkey-label" class="ov-hotkey"></span>
+                </button>
+                <button id="btn-goto-studio" class="ov-btn-secondary">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                  Open Prompt Studio
+                </button>
               </div>
+            </header>
+
+            <!-- Metrics row — all four numbers are real local data -->
+            <div class="ov-metrics">
+              <div class="ov-metric">
+                <div class="ov-metric-top">
+                  <span class="ov-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" />
+                      <path d="m9 10 2 2 4-4" />
+                    </svg>
+                  </span>
+                  <span class="ov-metric-label">Prompts checked</span>
+                </div>
+                <span class="ov-metric-value" id="stat-captures">0</span>
+                <span class="ov-metric-sub">All-time on this device</span>
+              </div>
+              <div class="ov-metric ov-metric-accent">
+                <div class="ov-metric-top">
+                  <span class="ov-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+                      <path d="m3 12 9 5 9-5" />
+                    </svg>
+                  </span>
+                  <span class="ov-metric-label">Tokens saved</span>
+                </div>
+                <span class="ov-metric-value" id="stat-tokens-saved">0</span>
+                <span class="ov-metric-sub">Exploration cost avoided</span>
+              </div>
+              <div class="ov-metric">
+                <div class="ov-metric-top">
+                  <span class="ov-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M19 5 5 19" />
+                      <circle cx="6.5" cy="6.5" r="2.5" />
+                      <circle cx="17.5" cy="17.5" r="2.5" />
+                    </svg>
+                  </span>
+                  <span class="ov-metric-label">Avg. reduction</span>
+                </div>
+                <span class="ov-metric-value" id="ov-stat-avg-pct">0%</span>
+                <span class="ov-metric-sub">Per checked prompt</span>
+              </div>
+              <div class="ov-metric">
+                <div class="ov-metric-top">
+                  <span class="ov-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+                    </svg>
+                  </span>
+                  <span class="ov-metric-label">Linked projects</span>
+                </div>
+                <span class="ov-metric-value" id="ov-stat-projects">0</span>
+                <span class="ov-metric-sub">Local folders indexed</span>
+              </div>
+            </div>
+
+            <!-- Workspace zone: project + activity on the left, suggestions
+                 on the right (stacks to one column in the default window) -->
+            <div class="ov-grid">
+              <div class="ov-col-main">
+                <section class="ov-panel" aria-labelledby="ov-project-title">
+                  <div class="ov-panel-header">
+                    <h2 id="ov-project-title" class="ov-panel-title">Active project</h2>
+                    <button id="btn-goto-projects" class="link-btn">Manage</button>
+                  </div>
+                  <div id="overview-active-project" class="ov-panel-body"></div>
+                </section>
+
+                <section class="ov-panel" aria-labelledby="ov-activity-title">
+                  <div class="ov-panel-header">
+                    <h2 id="ov-activity-title" class="ov-panel-title">Recent activity</h2>
+                  </div>
+                  <div class="ov-panel-body">
+                    <ol id="recent-activity-list" class="ov-timeline"></ol>
+                    <div id="recent-activity-empty" class="ov-empty">
+                      <div class="ov-empty-icon">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="M12 7v5l3 2" />
+                        </svg>
+                      </div>
+                      <p class="ov-empty-title">No activity yet</p>
+                      <p class="ov-empty-desc">
+                        Every prompt you check lands here as a timeline, with the tokens each rewrite saved.
+                      </p>
+                      <button id="btn-ov-first-prompt" class="ov-btn-secondary">Check your first prompt</button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <aside class="ov-col-side">
+                <section class="ov-panel" aria-labelledby="ov-insights-title">
+                  <div class="ov-panel-header">
+                    <h2 id="ov-insights-title" class="ov-panel-title">Suggestions</h2>
+                  </div>
+                  <div id="ov-insights" class="ov-panel-body ov-insights"></div>
+                </section>
+              </aside>
             </div>
           </section>
 
