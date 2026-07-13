@@ -1535,10 +1535,6 @@ button.ov-insight:hover {
    Prompt Studio history) — this page earns its own identity, they don't.
    ========================================================================== */
 
-.proj-page {
-  max-width: 1000px;
-  margin: 0 auto;
-}
 
 .proj-header {
   display: flex;
