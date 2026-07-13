@@ -33,3 +33,5 @@ desktop/*.app/
 .roo
 .trae
 .windsurf
+
+metriq-chrome-extension-*.zip
