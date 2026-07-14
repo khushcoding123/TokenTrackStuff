@@ -437,11 +437,12 @@
           <!-- Usage -->
           <section id="page-usage" class="page hidden">
             <header class="usg-header">
-              <div>
-                <h1 class="page-title">Usage</h1>
+              <div class="usg-header-copy">
+                <h1 id="usage-title" class="page-title">Claude Usage</h1>
                 <p class="muted page-subtitle">
-                  Real token usage from your Claude Code and Codex logs on this machine.
+                  Imported from local agent logs on this machine.
                 </p>
+                <div id="usage-source-tabs" class="usg-source-tabs" role="tablist" aria-label="Coding agent"></div>
               </div>
               <div class="usg-header-actions">
                 <div id="usage-range" class="usg-range">
@@ -465,74 +466,98 @@
                   <path d="m19 9-5 5-4-4-3 3" />
                 </svg>
               </div>
-              <p class="empty-state-title">No usage logs found yet</p>
-              <p class="muted">Use Claude Code or Codex on this machine, then check back here.</p>
+              <p id="usage-empty-title" class="empty-state-title">No usage logs found yet</p>
+              <p id="usage-empty-body" class="muted">Use Claude Code or Codex on this machine, then check back here.</p>
+              <div id="usage-detected-sources" class="usg-detected-sources hidden"></div>
             </div>
 
             <div id="usage-content" class="hidden">
+              <div id="usage-banners" class="usg-banners"></div>
               <div class="usg-metrics" id="usage-tiles"></div>
 
-              <section class="usg-card usg-chart-card" aria-labelledby="usg-chart-title">
-                <div class="usg-chart-header">
+              <div class="usg-two-col">
+                <section class="usg-card usg-chart-card" aria-labelledby="usg-chart-title">
+                  <div class="usg-chart-header">
+                    <div>
+                      <h2 id="usg-chart-title">Daily usage</h2>
+                      <p class="muted usage-daily-caption">Hover a day to see what useful tokens accomplished and what caused wasted tokens.</p>
+                    </div>
+                    <div id="usage-chart-legend" class="usg-chart-legend"></div>
+                  </div>
+                  <div id="usage-chart-inspector" class="usg-chart-inspector"></div>
+                  <div id="usage-daily-chart" class="usage-bars usg-bars-lg"></div>
+                  <div id="usage-daily-labels" class="usage-daily-labels"></div>
+                </section>
+
+                <section class="usg-card" aria-labelledby="usg-limits-title">
+                  <div class="section-header">
+                    <h2 id="usg-limits-title">Session limits (5-hour windows)</h2>
+                  </div>
+                  <div id="usage-limits" class="usg-limits"></div>
+                </section>
+              </div>
+
+              <section id="usage-current-session" class="usg-card hidden" aria-labelledby="usg-current-session-title">
+                <div class="section-header">
+                  <h2 id="usg-current-session-title">This session</h2>
+                </div>
+                <div id="usage-current-session-body" class="usg-current-session"></div>
+              </section>
+
+              <section class="usg-card usg-impact-card" aria-labelledby="usg-impact-title">
+                <div class="usg-impact-header">
                   <div>
-                    <h2 id="usg-chart-title">Tokens per day</h2>
-                    <p class="muted usage-daily-caption">Hover a bar for the exact date and value.</p>
+                    <span class="usg-impact-eyebrow">Sustainability</span>
+                    <h2 id="usg-impact-title">How your tokens affect the world around you</h2>
+                    <p class="muted">A transparent benchmark-equivalent view of water, electricity, and carbon impact.</p>
                   </div>
-                  <div class="usg-chart-legend">
-                    <span id="usage-daily-peak" class="usg-chip"></span>
-                    <span id="usage-daily-avg" class="usg-chip"></span>
-                    <span id="usage-daily-today" class="usg-chip usg-chip-accent"></span>
-                  </div>
+                  <span class="usg-impact-estimate-badge">Estimate, not a meter reading</span>
                 </div>
-                <div id="usg-chart-switcher" class="usg-chart-switcher">
-                  <button class="usg-chart-tab is-active" data-series="totalTokens" data-format="tok">Tokens</button>
-                  <button class="usg-chart-tab" data-series="costUSD" data-format="usd">Cost</button>
-                  <button class="usg-chart-tab" data-series="outputTokens" data-format="tok">Output Tokens</button>
-                  <button class="usg-chart-tab" data-series="cacheSavingsUSD" data-format="usd">Cache Savings</button>
-                </div>
-                <div id="usage-daily-chart" class="usage-bars usg-bars-lg"></div>
-                <div id="usage-daily-labels" class="usage-daily-labels"></div>
+                <div id="usage-impact-body" class="usg-impact-body"></div>
               </section>
 
               <section class="usg-card" aria-labelledby="usg-insights-title">
                 <div class="section-header">
-                  <h2 id="usg-insights-title">AI Recommendations</h2>
+                  <h2 id="usg-insights-title">How to reduce your token usage</h2>
                 </div>
                 <div id="usage-insights" class="usage-insights"></div>
               </section>
 
               <section class="usg-card" aria-labelledby="usg-models-title">
                 <div class="section-header">
-                  <h2 id="usg-models-title">Usage breakdown</h2>
+                  <h2 id="usg-models-title">By model</h2>
                 </div>
-                <div class="usg-breakdown">
-                  <div id="usage-models" class="usage-models"></div>
-                  <div class="usg-distribution">
-                    <div id="usg-donut" class="usg-donut" role="img" aria-label="Cost share by model"></div>
-                    <ul id="usg-donut-legend" class="usg-donut-legend"></ul>
-                  </div>
-                </div>
+                <div id="usage-models" class="usg-model-cards"></div>
               </section>
 
               <section class="usg-card" aria-labelledby="usg-sessions-title">
-                <div class="section-header">
+                <div class="section-header usg-sessions-head">
                   <h2 id="usg-sessions-title">Recent sessions</h2>
+                  <input id="usage-search" class="input usg-search" type="text" placeholder="Search project, model, id…" />
                 </div>
-                <div class="usg-table-wrap">
+                <div class="usg-table-wrap desktop-only-table">
                   <table class="usg-table">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Date</th>
-                        <th>Requests</th>
-                        <th>Tokens</th>
-                        <th>Duration</th>
-                        <th>Cost</th>
-                        <th>Source</th>
+                        <th>Project / session</th>
+                        <th>Started</th>
+                        <th>Length</th>
+                        <th>Tokens (in / out / cached)</th>
+                        <th>Est. cost</th>
+                        <th>Models</th>
                       </tr>
                     </thead>
                     <tbody id="usage-sessions"></tbody>
                   </table>
+                </div>
+                <div id="usage-sessions-empty" class="muted empty-note hidden">No sessions match your search.</div>
+                <div class="usg-pagination">
+                  <span id="usage-sessions-summary" class="muted"></span>
+                  <div class="usg-pagination-controls">
+                    <button id="usage-page-prev" class="sidebar-icon-btn" type="button" aria-label="Previous page">‹</button>
+                    <span id="usage-page-info" class="muted"></span>
+                    <button id="usage-page-next" class="sidebar-icon-btn" type="button" aria-label="Next page">›</button>
+                  </div>
                 </div>
               </section>
 

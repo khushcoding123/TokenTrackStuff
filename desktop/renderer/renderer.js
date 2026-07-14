@@ -1490,13 +1490,11 @@
     return `${days}d ago`;
   }
 
-  // Rough, clearly-labeled illustrative estimate (not a precise/audited
-  // measurement) derived from real tokens-saved data — ~0.4g CO2 per 1,000
-  // tokens, a conservative ballpark for LLM inference energy use. Shown with
-  // a "~" and an "illustrative" sub-label in the UI so it never reads as a
-  // scientifically precise figure.
-  function formatCO2Estimate(savedTokens) {
-    const grams = savedTokens * 0.0004;
+  // Benchmark-equivalent avoided impact based on Google's measured median
+  // Gemini Apps text prompt (0.03g CO2e/request, May 2025). The saved-token
+  // percentage estimates what share of those prompt equivalents was avoided.
+  function formatCO2Estimate(captures, averageSavedPct) {
+    const grams = (Number(captures) || 0) * (Math.max(0, Number(averageSavedPct) || 0) / 100) * 0.03;
     if (grams < 0.1) return "<0.1g";
     if (grams < 1000) return `~${grams < 10 ? grams.toFixed(1) : Math.round(grams)}g`;
     return `~${(grams / 1000).toFixed(1)}kg`;
@@ -1573,7 +1571,10 @@
     document.getElementById("sustain-captures").textContent = summary.totalCaptures;
     document.getElementById("sustain-tokens-saved").textContent = summary.totalSavedTokens.toLocaleString();
     document.getElementById("sustain-avg-pct").textContent = `${summary.avgSavedPct}%`;
-    document.getElementById("sustain-co2-saved").textContent = formatCO2Estimate(summary.totalSavedTokens);
+    document.getElementById("sustain-co2-saved").textContent = formatCO2Estimate(
+      summary.totalCaptures,
+      summary.avgSavedPct
+    );
     document.getElementById("sus-summary-text").textContent =
       summary.totalCaptures > 0
         ? `You've optimized ${summary.totalCaptures} prompt${summary.totalCaptures === 1 ? "" : "s"} on this ` +
@@ -1602,366 +1603,783 @@
     }
   }
 
-  // --- Usage (real token tracking from local Claude Code / Codex logs) ------
+  // --- Usage (same data model as localhost /usage, rendered with desktop theming)
 
+  const usageTitle = document.getElementById("usage-title");
+  const usageSourceTabs = document.getElementById("usage-source-tabs");
   const usageEmpty = document.getElementById("usage-empty");
+  const usageEmptyTitle = document.getElementById("usage-empty-title");
+  const usageEmptyBody = document.getElementById("usage-empty-body");
+  const usageDetectedSources = document.getElementById("usage-detected-sources");
   const usageContent = document.getElementById("usage-content");
+  const usageBanners = document.getElementById("usage-banners");
   const usageTiles = document.getElementById("usage-tiles");
   const usageDailyChart = document.getElementById("usage-daily-chart");
   const usageDailyLabels = document.getElementById("usage-daily-labels");
-  const usageDailyPeak = document.getElementById("usage-daily-peak");
-  const usageDailyAvg = document.getElementById("usage-daily-avg");
-  const usageDailyToday = document.getElementById("usage-daily-today");
+  const usageChartLegend = document.getElementById("usage-chart-legend");
+  const usageChartInspector = document.getElementById("usage-chart-inspector");
+  const usageLimits = document.getElementById("usage-limits");
+  const usageCurrentSession = document.getElementById("usage-current-session");
+  const usageCurrentSessionBody = document.getElementById("usage-current-session-body");
+  const usageImpactBody = document.getElementById("usage-impact-body");
   const usageInsights = document.getElementById("usage-insights");
   const usageModels = document.getElementById("usage-models");
   const usageSessions = document.getElementById("usage-sessions");
+  const usageSessionsEmpty = document.getElementById("usage-sessions-empty");
+  const usageSearch = document.getElementById("usage-search");
+  const usageSessionsSummary = document.getElementById("usage-sessions-summary");
+  const usagePageInfo = document.getElementById("usage-page-info");
+  const usagePagePrev = document.getElementById("usage-page-prev");
+  const usagePageNext = document.getElementById("usage-page-next");
   const usageMeta = document.getElementById("usage-meta");
   const usageRangeButtons = document.querySelectorAll(".usage-range-btn");
-  const usgChartTabs = document.querySelectorAll(".usg-chart-tab");
-  const usgDonut = document.getElementById("usg-donut");
-  const usgDonutLegend = document.getElementById("usg-donut-legend");
   const btnRefreshUsage = document.getElementById("btn-refresh-usage");
 
   let usageDays = 30;
-  let usageChartSeries = "totalTokens";
-  let usageChartFormat = "tok";
+  let selectedUsageSource = "claude-code";
+  let usageQuery = "";
+  let usagePage = 1;
   let latestUsageData = null;
 
   const USG_ICON_PATHS = {
     token: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 12h6"/>',
     dollar: '<path d="M12 2v20M17 6.5c0-1.9-2.2-3.5-5-3.5S7 4.6 7 6.5 9.2 10 12 10s5 1.6 5 3.5-2.2 3.5-5 3.5-5-1.6-5-3.5"/>',
     zap: '<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/>',
-    upload: '<path d="M12 20V8M7 12l5-5 5 5"/><path d="M4 20h16"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
     warning: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
     flame: '<path d="M12 22c4-1 7-4 7-8.5 0-3-1.5-5-3-7 0 2-1 3.5-2.5 3.5C14.5 7 14 4 11 2c.5 3-1 5-3 7.5-1 1.3-2 3-2 4.5C6 18 8 21 12 22Z"/>',
     check: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
     robot: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
-    refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v6h-6"/>',
+    hourglass: '<path d="M7 3h10M7 21h10"/><path d="M8 3c0 4 4 4.5 4 9s-4 5-4 9M16 3c0 4-4 4.5-4 9s4 5 4 9"/>',
   };
-
   const USG_SEVERITY_ICON = { high: "warning", medium: "flame", info: "check" };
+  const USG_SOURCE_META = {
+    "claude-code": { label: "Claude", logo: "claude.png" },
+    codex: { label: "Codex", logo: "chatgpt.webp" },
+    cursor: { label: "Cursor", logo: "cursor.png" },
+  };
+  const USG_DAILY_STACK = [
+    { key: "usefulTokens", label: "Useful", className: "is-useful" },
+    { key: "wastedTokens", label: "Wasted", className: "is-waste" },
+  ];
+  const USG_INTENT_COLORS = {
+    bugfix: "#ff5d73",
+    feature: "#3b82f6",
+    refactor: "#a78bfa",
+    testing: "#22c55e",
+    question: "#f6c344",
+    other: "#94a3b8",
+  };
+  const USG_WASTE_COLORS = {
+    rework: "#ff5d73",
+    retries: "#fb7185",
+    uncachedContext: "#ff8a1f",
+    vagueExploration: "#f6c344",
+  };
+  const USG_PAGE_SIZE = 6;
 
   function fmtTok(n) {
-    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n == null) return "—";
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
     if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
     return String(Math.round(n || 0));
+  }
+
+  function usd(n) {
+    if (n == null) return "—";
+    return "$" + Number(n || 0).toFixed(2);
   }
 
   function fmtShortDate(dateStr) {
     return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
-  function usd(n) {
-    return "$" + (n || 0).toFixed(2);
+  function fmtSessionDate(iso) {
+    return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   }
 
   function fmtDuration(ms) {
     if (!ms || ms < 60_000) return "<1m";
     const mins = Math.round(ms / 60_000);
     if (mins < 60) return `${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    const rem = mins % 60;
-    return rem ? `${hrs}h ${rem}m` : `${hrs}h`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
   }
 
-  function fmtSessionDate(iso) {
-    return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  }
-
-  // A lightweight, honest "trend" — no separate prior-period fetch exists,
-  // so this compares the second half of the already-fetched range against
-  // the first half (same data, no new IPC call) rather than inventing a
-  // number. A first-half-vs-second-half "trend %" was tried and dropped —
-  // this kind of usage is inherently bursty (a few heavy coding days, near-
-  // zero otherwise), so any two-window average comparison keeps producing
-  // meaningless swings (e.g. "+3650%") no matter how the threshold is
-  // tuned. Rather than paper over that with more heuristics, the card just
-  // shows the real total and its real supporting stat.
-  function renderUsageTile(icon, label, value, sub) {
-    const card = document.createElement("div");
-    card.className = "usg-metric";
-    const top = document.createElement("div");
-    top.className = "usg-metric-top";
-    const iconWrap = document.createElement("span");
-    iconWrap.className = "usg-metric-icon";
-    iconWrap.innerHTML = svgIcon(USG_ICON_PATHS[icon] || "");
-    const l = document.createElement("span");
-    l.className = "usg-metric-label";
-    l.textContent = label;
-    top.append(iconWrap, l);
-    const v = document.createElement("span");
-    v.className = "usg-metric-value";
-    v.textContent = value;
-    card.append(top, v);
-    if (sub) {
-      const s = document.createElement("span");
-      s.className = "usg-metric-sub";
-      s.textContent = sub;
-      card.append(s);
+  function fmtImpact(value, unit, largerUnit, scale) {
+    const amount = Math.max(0, Number(value) || 0);
+    if (amount === 0) return `0 ${unit}`;
+    if (scale && amount >= scale) {
+      const converted = amount / scale;
+      return `~${converted < 10 ? converted.toFixed(2) : converted.toFixed(1)} ${largerUnit}`;
     }
-    return card;
+    if (amount < 0.1) return `<0.1 ${unit}`;
+    return `~${amount < 10 ? amount.toFixed(2) : amount.toFixed(1)} ${unit}`;
   }
 
-  function renderUsageInsight(insight) {
-    const div = document.createElement("div");
-    div.className = `usage-insight ${insight.severity}`;
-    const head = document.createElement("div");
-    head.className = "usage-insight-head";
-    const iconWrap = document.createElement("span");
-    iconWrap.className = "usage-insight-icon";
-    iconWrap.innerHTML = svgIcon(USG_ICON_PATHS[USG_SEVERITY_ICON[insight.severity]] || USG_ICON_PATHS.flame, "icon-sm");
-    const h = document.createElement("h3");
-    h.textContent = insight.title;
-    head.append(iconWrap, h);
-    const evidence = document.createElement("p");
-    evidence.textContent = insight.evidence;
-    const action = document.createElement("p");
-    action.className = "usage-insight-action";
-    action.textContent = `→ ${insight.action}`;
-    div.append(head, evidence, action);
-    return div;
+  function fmtWater(ml) {
+    return fmtImpact(ml, "mL", "L", 1000);
   }
 
-  // Reuses the same bundled logo assets as the Tools/Integration Hub page
-  // (assets/logos/) — real files, not fabricated model art. Falls back to
-  // the generic robot outline for any other source.
-  const USG_MODEL_LOGO = { "claude-code": "claude.png", codex: "chatgpt.webp" };
+  function fmtEnergy(wh) {
+    return fmtImpact(wh, "Wh", "kWh", 1000);
+  }
 
-  function renderModelIcon(container, source) {
-    const logoFile = USG_MODEL_LOGO[source];
-    if (!logoFile) {
+  function fmtCarbon(grams) {
+    return fmtImpact(grams, "g CO2e", "kg CO2e", 1000);
+  }
+
+  function sourceLabel(source) {
+    return USG_SOURCE_META[source]?.label || source;
+  }
+
+  function renderSourceIcon(container, source) {
+    container.innerHTML = "";
+    const logo = USG_SOURCE_META[source]?.logo;
+    if (!logo) {
       container.innerHTML = svgIcon(USG_ICON_PATHS.robot, "icon-sm");
       return;
     }
     const img = document.createElement("img");
     img.className = "usg-model-logo";
-    img.src = `assets/logos/${logoFile}`;
+    img.src = `assets/logos/${logo}`;
     img.alt = "";
-    img.addEventListener("error", () => { container.innerHTML = svgIcon(USG_ICON_PATHS.robot, "icon-sm"); }, { once: true });
+    img.addEventListener("error", () => {
+      container.innerHTML = svgIcon(USG_ICON_PATHS.robot, "icon-sm");
+    }, { once: true });
     container.append(img);
   }
 
-  function renderUsageModelRow(model, totalCost) {
-    const row = document.createElement("div");
-    row.className = "usage-model-row";
-
-    const label = document.createElement("div");
-    label.className = "usage-model-label";
-    const iconWrap = document.createElement("span");
-    iconWrap.className = "usg-model-icon";
-    renderModelIcon(iconWrap, model.source);
-    const name = document.createElement("span");
-    name.className = "usg-model-name";
-    name.textContent = model.label;
-    const pct = document.createElement("span");
-    pct.className = "usg-model-pct muted";
-    pct.textContent = totalCost > 0 ? `${Math.round((model.costUSD / totalCost) * 100)}%` : "N/A";
-    const cost = document.createElement("span");
-    cost.className = "cost";
-    cost.textContent = usd(model.costUSD);
-    label.append(iconWrap, name, pct, cost);
-
-    const meta = document.createElement("div");
-    meta.className = "usg-model-meta muted";
-    meta.textContent = `${model.requests} requests · ${fmtTok(model.totalTokens)} tokens`;
-
-    const track = document.createElement("div");
-    track.className = "usage-model-bar-track";
-    const fill = document.createElement("div");
-    fill.className = "usage-model-bar-fill";
-    fill.style.width = "0%";
-    track.append(fill);
-    requestAnimationFrame(() => {
-      fill.style.width = `${totalCost > 0 ? (model.costUSD / totalCost) * 100 : 0}%`;
-    });
-
-    row.append(label, meta, track);
-    return row;
-  }
-
-  const USG_DONUT_COLORS = [
-    "var(--accent-primary)",
-    "var(--accent-secondary)",
-    "color-mix(in srgb, var(--accent-primary) 55%, var(--surface-2))",
-    "color-mix(in srgb, var(--accent-secondary) 55%, var(--surface-2))",
-    "var(--surface-2)",
-  ];
-
-  function renderUsageDonut(models, totalCost) {
-    usgDonutLegend.innerHTML = "";
-    if (!totalCost || !models.length) {
-      usgDonut.style.background = "var(--surface-2)";
-      return;
-    }
-    let cursor = 0;
-    const stops = [];
-    models.forEach((model, i) => {
-      const color = USG_DONUT_COLORS[Math.min(i, USG_DONUT_COLORS.length - 1)];
-      const share = (model.costUSD / totalCost) * 100;
-      const start = cursor;
-      const end = cursor + share;
-      stops.push(`${color} ${start}% ${end}%`);
-      cursor = end;
-
-      const li = document.createElement("li");
-      const swatch = document.createElement("span");
-      swatch.className = "usg-donut-swatch";
-      swatch.style.background = color;
-      const text = document.createElement("span");
-      text.textContent = `${model.label} · ${Math.round(share)}%`;
-      li.append(swatch, text);
-      usgDonutLegend.append(li);
-    });
-    usgDonut.style.background = `conic-gradient(${stops.join(", ")})`;
-  }
-
-  function renderUsageSessionRow(session) {
-    const tr = document.createElement("tr");
-
-    const projectCell = document.createElement("td");
-    projectCell.className = "usg-cell-project";
-    const iconWrap = document.createElement("span");
-    iconWrap.className = "usg-row-icon";
-    iconWrap.innerHTML = svgIcon(USG_ICON_PATHS.folder, "icon-sm");
-    const name = document.createElement("span");
-    name.textContent = session.project || "No project";
-    projectCell.append(iconWrap, name);
-
-    const dateCell = document.createElement("td");
-    dateCell.textContent = fmtSessionDate(session.startedAt);
-
-    const reqCell = document.createElement("td");
-    reqCell.className = "usg-cell-num";
-    reqCell.textContent = session.requests;
-
-    const tokCell = document.createElement("td");
-    tokCell.className = "usg-cell-num";
-    tokCell.textContent = fmtTok(session.totalTokens);
-
-    const durCell = document.createElement("td");
-    durCell.className = "usg-cell-num";
-    durCell.textContent = fmtDuration(session.durationMs);
-
-    const costCell = document.createElement("td");
-    costCell.className = "usg-cell-num usg-cell-cost";
-    costCell.textContent = usd(session.costUSD);
-
-    const sourceCell = document.createElement("td");
+  function renderSourceBadge(source) {
     const badge = document.createElement("span");
-    badge.className = `usg-source-badge usg-source-${session.source}`;
-    badge.textContent = session.source === "codex" ? "Codex" : "Claude Code";
-    sourceCell.append(badge);
-
-    tr.append(projectCell, dateCell, reqCell, tokCell, durCell, costCell, sourceCell);
-    return tr;
+    badge.className = `usg-source-badge usg-source-${source}`;
+    badge.textContent = sourceLabel(source);
+    return badge;
   }
 
-  function renderUsageChart() {
-    const daily = (latestUsageData && latestUsageData.daily) || [];
-    const format = usageChartFormat === "usd" ? usd : fmtTok;
-    const dmax = Math.max(...daily.map((d) => d[usageChartSeries] || 0), 1);
+  function emptyStateMessage(source, detectedSources) {
+    const installed = detectedSources.includes(source);
+    if (source === "claude-code") {
+      return installed
+        ? "Claude Code is installed, but no session logs were found in this date range. Try 90 days or run a Claude Code session, then refresh."
+        : "Claude Code wasn't found on this machine. Install it and run a session — Metriq checks ~/.config/claude/projects/ and ~/.claude/projects/ automatically.";
+    }
+    if (source === "codex") {
+      return installed
+        ? "Codex is installed, but no session logs were found in this date range. Try a wider range or run Codex in a project, then refresh."
+        : "Codex wasn't found on this machine. Install the Codex CLI and run a session — Metriq reads ~/.codex/sessions/ automatically.";
+    }
+    if (source === "cursor") {
+      return installed
+        ? "Cursor is installed, but no agent transcripts were found in this date range. Use the Cursor agent in a project, then refresh."
+        : "Cursor wasn't found on this machine. Install Cursor and use the agent in a project — Metriq reads ~/.cursor/projects/*/agent-transcripts/ automatically.";
+    }
+    return "No usage data for this agent in the selected range.";
+  }
+
+  function renderUsageSourceTabs(detectedSources) {
+    usageSourceTabs.innerHTML = "";
+    ["claude-code", "codex", "cursor"].forEach((source) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `usg-source-tab${selectedUsageSource === source ? " is-active" : ""}`;
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", selectedUsageSource === source ? "true" : "false");
+      btn.innerHTML = `<span>${sourceLabel(source)}</span>${detectedSources.includes(source) ? "" : '<span class="usg-source-tab-note">not found</span>'}`;
+      btn.addEventListener("click", () => {
+        if (selectedUsageSource === source) return;
+        selectedUsageSource = source;
+        usagePage = 1;
+        refreshUsage();
+      });
+      usageSourceTabs.append(btn);
+    });
+  }
+
+  function renderUsageTile(label, value, note, accent = false) {
+    const card = document.createElement("div");
+    card.className = "usg-metric";
+    const l = document.createElement("span");
+    l.className = "usg-metric-label";
+    l.textContent = label;
+    const v = document.createElement("span");
+    v.className = `usg-metric-value${accent ? " is-accent" : ""}`;
+    v.textContent = value;
+    const s = document.createElement("span");
+    s.className = "usg-metric-sub";
+    s.textContent = note;
+    card.append(l, v, s);
+    return card;
+  }
+
+  function renderUsageBanners(data) {
+    usageBanners.innerHTML = "";
+    if (data.selectedSource === "cursor") {
+      const banner = document.createElement("div");
+      banner.className = "usg-banner";
+      banner.innerHTML =
+        "<strong>Estimated numbers.</strong> Cursor's local transcripts don't record exact token usage, so these figures are estimated from message text with Metriq's offline tokenizer.";
+      usageBanners.append(banner);
+    }
+  }
+
+  function renderUsageHeadline(data) {
+    const t = data.totals;
+    usageTiles.innerHTML = "";
+    usageTiles.append(
+      renderUsageTile("Total tokens", fmtTok(t.totalTokens), `${fmtTok(t.inputTokens + t.cacheCreationTokens)} fresh input`, true),
+      renderUsageTile("Est. cost", usd(t.costUSD), "API-equivalent pricing"),
+      renderUsageTile("Saved by caching", usd(t.cacheSavingsUSD), `${fmtTok(t.cacheReadTokens)} cached reads`, true),
+      renderUsageTile("Sessions", String((data.sessions || []).length), `last ${data.days} days`)
+    );
+  }
+
+  function renderUsageChart(data) {
+    const daily = (data.daily || []).length > 45 ? data.daily.filter((_, index) => index % 2 === 0) : (data.daily || []);
+    const chartMax = Math.max(1, ...daily.map((day) => day.totalTokens || 0));
+    usageChartLegend.innerHTML = "";
+    USG_DAILY_STACK.forEach((segment) => {
+      const item = document.createElement("span");
+      item.className = "usg-chart-key";
+      item.innerHTML = `<span class="usg-chart-dot ${segment.className}"></span>${segment.label}`;
+      usageChartLegend.append(item);
+    });
+
+    function setInspector(day) {
+      if (!day) {
+        usageChartInspector.innerHTML = "";
+        return;
+      }
+      const topUseful = day.behavior?.usefulBreakdown?.[0];
+      const topWaste = day.behavior?.wasteBreakdown?.[0];
+      usageChartInspector.innerHTML = `
+        <div class="usg-chart-inspector-card">
+          <strong>${fmtShortDate(day.date)}</strong>
+          <span>${fmtTok(day.totalTokens)} total tokens</span>
+          <span>${day.behavior?.usefulPct ?? 0}% useful${topUseful ? ` · mostly ${topUseful.label.toLowerCase()}` : ""}</span>
+          <span>${day.behavior?.wastedPct ?? 0}% wasted${topWaste ? ` · mostly ${topWaste.label.toLowerCase()}` : ""}</span>
+        </div>
+      `;
+    }
+
+    let tooltip = document.getElementById("usage-chart-tooltip");
+    if (!tooltip) {
+      tooltip = document.createElement("div");
+      tooltip.id = "usage-chart-tooltip";
+      tooltip.className = "usg-cursor-tooltip";
+      tooltip.setAttribute("role", "tooltip");
+      document.body.append(tooltip);
+    }
+
+    function setTooltipContent(day) {
+      const usefulPct = day.behavior?.usefulPct ?? 0;
+      const wastedPct = day.behavior?.wastedPct ?? 0;
+      const usefulRows = (day.behavior?.usefulBreakdown || [])
+        .map((intent) => `
+          <div class="usg-tooltip-detail-row">
+            <span><i style="background:${USG_INTENT_COLORS[intent.key] || USG_INTENT_COLORS.other}"></i>${intent.label}</span>
+            <strong>${fmtTok(intent.tokens)} · ${intent.pctOfUseful}%</strong>
+          </div>
+        `)
+        .join("") || '<p class="usg-tooltip-empty">No productive activity was classified.</p>';
+      const wasteRows = (day.behavior?.wasteBreakdown || [])
+        .map((waste) => `
+          <div class="usg-tooltip-detail-row">
+            <span><i style="background:${USG_WASTE_COLORS[waste.key] || "#ff8a1f"}"></i>${waste.label}</span>
+            <strong>${fmtTok(waste.tokens)} · ${waste.pctOfWaste}%</strong>
+          </div>
+        `)
+        .join("") || '<p class="usg-tooltip-empty">No avoidable waste was detected.</p>';
+      tooltip.innerHTML = `
+        <div class="usg-tooltip-header">
+          <strong>${fmtShortDate(day.date)}</strong>
+          <span>${fmtTok(day.totalTokens)} total tokens</span>
+        </div>
+        <div class="usg-tooltip-split">
+          <div class="is-useful">
+            <span>Useful</span>
+            <strong>${usefulPct}%</strong>
+            <small>${fmtTok(day.behavior?.usefulTokens || 0)} tokens</small>
+          </div>
+          <div class="is-waste">
+            <span>Wasted</span>
+            <strong>${wastedPct}%</strong>
+            <small>${fmtTok(day.behavior?.wastedTokens || 0)} tokens</small>
+          </div>
+        </div>
+        <div class="usg-tooltip-section">
+          <h4>Useful tokens went to</h4>
+          ${usefulRows}
+        </div>
+        <div class="usg-tooltip-section is-waste">
+          <h4>Wasted tokens went to</h4>
+          ${wasteRows}
+        </div>
+      `;
+    }
+
+    function placeTooltip(clientX, clientY) {
+      const gap = 16;
+      const width = tooltip.offsetWidth || 210;
+      const height = tooltip.offsetHeight || 120;
+      let left = clientX + gap;
+      let top = clientY - height - gap;
+      if (left + width > window.innerWidth - 12) left = clientX - width - gap;
+      if (top < 12) top = clientY + gap;
+      if (top + height > window.innerHeight - 12) top = window.innerHeight - height - 12;
+      tooltip.style.left = `${Math.max(12, left)}px`;
+      tooltip.style.top = `${Math.max(12, top)}px`;
+    }
+
+    function showTooltip(day, clientX, clientY) {
+      setTooltipContent(day);
+      tooltip.classList.add("is-visible");
+      placeTooltip(clientX, clientY);
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove("is-visible");
+    }
 
     usageDailyChart.innerHTML = "";
-    daily.forEach((d, i) => {
+    daily.forEach((day) => {
+      const usefulPct = day.behavior?.usefulPct ?? 0;
+      const wastedPct = day.behavior?.wastedPct ?? 0;
       const bar = document.createElement("div");
       bar.className = "usage-bar";
-      if (i === daily.length - 1) bar.classList.add("is-today");
-      const val = d[usageChartSeries] || 0;
-      bar.style.height = `${Math.max((val / dmax) * 100, 1)}%`;
-      bar.title = `${fmtShortDate(d.date)} · ${format(val)}`;
+      bar.classList.toggle("is-empty", !day.totalTokens);
+      bar.tabIndex = 0;
+      const barPct = day.totalTokens > 0 ? Math.max(Math.sqrt(day.totalTokens / chartMax) * 100, 12) : 0;
+      bar.style.height = `${barPct}%`;
+      const tip = [
+        `${day.date} · ${usd(day.costUSD)}`,
+        `Total tokens: ${fmtTok(day.totalTokens)}`,
+        `Useful: ${usefulPct}% · ${fmtTok(day.behavior?.usefulTokens || 0)}`,
+        `Wasted: ${wastedPct}% · ${fmtTok(day.behavior?.wastedTokens || 0)}`,
+      ];
+      if (day.sources && Object.keys(day.sources).length) {
+        tip.push(...Object.entries(day.sources).map(([source, totals]) => `${sourceLabel(source)}: ${fmtTok(totals.totalTokens)}`));
+      }
+      bar.setAttribute("aria-label", tip.join(". "));
+      bar.addEventListener("mouseenter", (event) => {
+        setInspector(day);
+        showTooltip(day, event.clientX, event.clientY);
+      });
+      bar.addEventListener("mousemove", (event) => placeTooltip(event.clientX, event.clientY));
+      bar.addEventListener("mouseleave", hideTooltip);
+      bar.addEventListener("focus", () => {
+        setInspector(day);
+        const rect = bar.getBoundingClientRect();
+        showTooltip(day, rect.left + rect.width / 2, rect.top);
+      });
+      bar.addEventListener("blur", hideTooltip);
+      USG_DAILY_STACK.slice().reverse().forEach((segment) => {
+        const part = document.createElement("div");
+        part.className = `usage-bar-segment ${segment.className}`;
+        const value = day.behavior?.[segment.key] || 0;
+        part.style.height = `${(value / Math.max(day.totalTokens, 1)) * 100 || 0}%`;
+        bar.append(part);
+      });
       usageDailyChart.append(bar);
     });
+    setInspector(daily[daily.length - 1] || null);
 
     usageDailyLabels.innerHTML = "";
     if (daily.length) {
-      const tickIdxs = [...new Set([0, Math.floor((daily.length - 1) / 2), daily.length - 1])];
-      for (const i of tickIdxs) {
-        const span = document.createElement("span");
-        span.textContent = fmtShortDate(daily[i].date);
-        usageDailyLabels.append(span);
+      const first = document.createElement("span");
+      const last = document.createElement("span");
+      first.textContent = daily[0].date;
+      last.textContent = daily[daily.length - 1].date;
+      usageDailyLabels.append(first, last);
+    }
+  }
+
+  function renderUsageLimits(data) {
+    const rateLimits = data.rateLimits;
+    const activeBlock = (data.blocks || []).find((block) => block.active) || null;
+    const recentBlocks = (data.blocks || []).filter((block) => !block.active).slice(0, 5);
+    usageLimits.innerHTML = "";
+
+    if (rateLimits?.primary) {
+      const primary = rateLimits.primary;
+      const wrap = document.createElement("div");
+      wrap.className = "usg-limit-stack";
+      wrap.innerHTML = `
+        <div class="usg-limit-summary">
+          <div class="usg-limit-stat"><span class="usg-limit-label">Used</span><strong>${Math.round(primary.used_percent || 0)}%</strong></div>
+          <div class="usg-limit-stat"><span class="usg-limit-label">Remaining</span><strong>${Math.max(0, 100 - Math.round(primary.used_percent || 0))}%</strong></div>
+        </div>
+        <div class="usg-progress"><span style="width:${Math.round(primary.used_percent || 0)}%"></span></div>
+        <p class="muted">Reported by your last Codex session${rateLimits.observedAt ? ` (${fmtSessionDate(rateLimits.observedAt)})` : ""}${rateLimits.plan_type ? ` — ${rateLimits.plan_type} plan` : ""}.</p>
+      `;
+      usageLimits.append(wrap);
+      if (rateLimits.secondary) {
+        const weekly = document.createElement("div");
+        weekly.className = "usg-limit-secondary";
+        weekly.innerHTML = `
+          <div class="usg-limit-row"><span>Weekly window</span><span>${Math.round(rateLimits.secondary.used_percent || 0)}% used</span></div>
+          <div class="usg-progress is-secondary"><span style="width:${Math.round(rateLimits.secondary.used_percent || 0)}%"></span></div>
+        `;
+        usageLimits.append(weekly);
       }
+    } else {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent =
+        data.selectedSource === "codex"
+          ? "No live limit telemetry in these logs, so an exact percent of your plan limit is unavailable. Showing activity per 5-hour window instead."
+          : data.selectedSource === "claude-code"
+            ? "Claude Code doesn't report live session-limit percentages in its local logs. Showing activity per 5-hour window instead."
+            : "Cursor doesn't report session limits in its local transcripts. Showing activity per 5-hour window instead.";
+      usageLimits.append(p);
     }
 
-    const peakDay = daily.reduce(
-      (max, d) => (!max || (d[usageChartSeries] || 0) > (max[usageChartSeries] || 0) ? d : max),
+    if (activeBlock) {
+      const active = document.createElement("div");
+      active.className = "usg-window-card";
+      active.innerHTML = `<div class="usg-limit-row"><strong>Current window</strong><span>${fmtTok(activeBlock.totalTokens)} · ${usd(activeBlock.costUSD)}</span></div><p class="muted">Window started ${fmtSessionDate(activeBlock.start)} · resets ${fmtSessionDate(activeBlock.end)}</p>`;
+      usageLimits.append(active);
+    }
+
+    if (recentBlocks.length) {
+      const list = document.createElement("div");
+      list.className = "usg-window-list";
+      recentBlocks.forEach((block) => {
+        const row = document.createElement("div");
+        row.className = "usg-window-row";
+        row.innerHTML = `<span>${fmtSessionDate(block.start)}</span><span>${fmtTok(block.totalTokens)}</span>`;
+        list.append(row);
+      });
+      usageLimits.append(list);
+    }
+  }
+
+  function renderCurrentSession(data) {
+    const session = data.currentSession;
+    usageCurrentSession.classList.toggle("hidden", !session);
+    if (!session) {
+      usageCurrentSessionBody.innerHTML = "";
+      return;
+    }
+    const primaryIntent = (session.intents || []).reduce(
+      (largest, intent) => (!largest || intent.pctOfSession > largest.pctOfSession ? intent : largest),
       null
     );
-    usageDailyPeak.textContent =
-      peakDay && peakDay[usageChartSeries] > 0 ? `Peak ${format(peakDay[usageChartSeries])} · ${fmtShortDate(peakDay.date)}` : "";
-
-    const total = daily.reduce((s, d) => s + (d[usageChartSeries] || 0), 0);
-    usageDailyAvg.textContent = daily.length ? `Avg ${format(total / daily.length)}/day` : "";
-
-    const today = daily[daily.length - 1];
-    usageDailyToday.textContent = today ? `Today ${format(today[usageChartSeries] || 0)}` : "";
-  }
-
-  for (const tab of usgChartTabs) {
-    tab.addEventListener("click", () => {
-      usageChartSeries = tab.dataset.series;
-      usageChartFormat = tab.dataset.format;
-      for (const t of usgChartTabs) t.classList.toggle("is-active", t === tab);
-      renderUsageChart();
+    let donutCursor = 0;
+    const donutStops = (session.intents || []).map((intent) => {
+      const start = donutCursor;
+      donutCursor += (intent.tokens / Math.max(session.sessionTokens, 1)) * 100;
+      return `${USG_INTENT_COLORS[intent.key] || USG_INTENT_COLORS.other} ${start}% ${donutCursor}%`;
     });
+    if (donutCursor < 100) donutStops.push(`${USG_INTENT_COLORS.other} ${donutCursor}% 100%`);
+    const donutStyle = donutStops.length
+      ? `background: conic-gradient(${donutStops.join(", ")})`
+      : "background: var(--surface-1)";
+    const intentRows = (session.intents || [])
+      .map((intent) => {
+        return `
+          <div class="usg-intent-row">
+            <div class="usg-mini-row">
+              <span class="usg-mini-row-label"><span class="usg-intent-dot" style="background:${USG_INTENT_COLORS[intent.key] || USG_INTENT_COLORS.other}"></span>${intent.label}</span>
+              <strong>${intent.pctOfSession}%</strong>
+            </div>
+            <div class="usg-intent-meta">${fmtTok(intent.tokens)} tokens · ${intent.turns} turn${intent.turns === 1 ? "" : "s"}${intent.pctOfLimit != null ? ` · ${intent.pctOfLimit}% of limit` : ""}</div>
+          </div>
+        `;
+      })
+      .join("");
+    const wasteRows = (session.waste || [])
+      .map((waste) => {
+        const width = Math.max(6, (waste.tokens / Math.max(session.wastedTokens, 1)) * 100);
+        return `<div class="usg-waste-row"><div class="usg-mini-row"><span>${waste.label}</span><span>${fmtTok(waste.tokens)} · ${waste.turns} turn${waste.turns === 1 ? "" : "s"}</span></div><div class="usg-progress is-waste"><span style="width:${width}%"></span></div><p class="muted usg-waste-hint">${waste.hint}</p></div>`;
+      })
+      .join("") || '<p class="muted">No wasted tokens detected in this session.</p>';
+    usageCurrentSessionBody.innerHTML = `
+      <div class="usg-current-grid">
+        <div class="usg-current-card">
+          <h3>How this session used tokens</h3>
+          <p class="muted">${session.project} · ${sourceLabel(session.source)} · ${session.turns} turns since ${fmtSessionDate(session.startedAt)}</p>
+          <div class="usg-session-breakdown">
+            <div class="usg-session-donut" style="${donutStyle}" role="img" aria-label="Session activity breakdown">
+              <div class="usg-session-donut-center">
+                <strong>${fmtTok(session.sessionTokens)}</strong>
+                <span>tokens</span>
+              </div>
+            </div>
+            <div class="usg-session-legend">
+              <p>Each color is a separate kind of work. The percentages add up to your full session.</p>
+              <div class="usg-mini-list">${intentRows}</div>
+            </div>
+          </div>
+          <div class="usg-session-highlight">
+            <span class="usg-session-highlight-label">Main activity</span>
+            <span>${primaryIntent ? `${primaryIntent.label} (${primaryIntent.pctOfSession}% of session)` : "No activity breakdown yet"}</span>
+          </div>
+        </div>
+        <div class="usg-current-card">
+          <h3>Where tokens were wasted</h3>
+          <p class="muted">${fmtTok(session.wastedTokens)} wasted · ${session.wastedPct}% of this session · ${fmtTok(Math.max(0, session.sessionTokens - session.wastedTokens))} useful</p>
+          <div class="usg-progress is-useful-split">
+            <span class="is-useful" style="width:${Math.max(0, 100 - session.wastedPct)}%"></span>
+            <span class="is-waste" style="width:${session.wastedPct}%"></span>
+          </div>
+          <div class="usg-mini-list">${wasteRows}</div>
+        </div>
+      </div>
+    `;
   }
 
-  async function refreshUsage() {
-    const data = await window.metriq.getUsage(usageDays);
-    const available = Boolean(data && data.available);
-    usageEmpty.classList.toggle("hidden", available);
-    usageContent.classList.toggle("hidden", !available);
-    if (!available) return;
+  function renderUsageImpact(data) {
+    const impact = data.impact;
+    if (!impact?.available) {
+      usageImpactBody.innerHTML = `
+        <div class="usg-impact-empty">
+          <strong>Not enough request data yet</strong>
+          <span>Run an agent session and refresh to estimate its benchmark-equivalent footprint.</span>
+        </div>
+      `;
+      return;
+    }
 
-    latestUsageData = data;
-    const t = data.totals;
-    const reqs = (data.models || []).reduce((sum, m) => sum + m.requests, 0);
-    const contextTokens = t.inputTokens + t.cacheCreationTokens + t.cacheReadTokens;
-    const cacheHitRate = contextTokens > 0 ? t.cacheReadTokens / contextTokens : 0;
+    const wasteCauses = new Map();
+    (data.daily || []).forEach((day) => {
+      (day.behavior?.wasteBreakdown || []).forEach((waste) => {
+        const current = wasteCauses.get(waste.key) || { ...waste, tokens: 0, turns: 0 };
+        current.tokens += waste.tokens;
+        current.turns += waste.turns;
+        wasteCauses.set(waste.key, current);
+      });
+    });
+    const topWaste = [...wasteCauses.values()].sort((a, b) => b.tokens - a.tokens)[0] || null;
+    const wastePct = Math.round(impact.wastedShare * 1000) / 10;
+    const usefulTokens = Math.max(0, impact.totalTokens - impact.wastedTokens);
+    const savingText = (formattedValue) => impact.wastedTokens > 0
+      ? `<b>${formattedValue}</b> potentially avoidable`
+      : "<b>None</b> avoidable waste detected";
 
-    usageTiles.innerHTML = "";
-    usageTiles.append(
-      renderUsageTile("token", "Total tokens", fmtTok(t.totalTokens), `${reqs} requests`),
-      renderUsageTile("dollar", "Estimated cost", usd(t.costUSD), "API-equivalent"),
-      renderUsageTile("zap", "Cache savings", usd(t.cacheSavingsUSD), `${Math.round(cacheHitRate * 100)}% cache hit`),
-      renderUsageTile("upload", "Output tokens", fmtTok(t.outputTokens), `${fmtTok(t.inputTokens)} input`)
-    );
+    usageImpactBody.innerHTML = `
+      <div class="usg-impact-hero">
+        <div class="usg-impact-score" style="--impact-score:${impact.efficiencyPct * 3.6}deg">
+          <div>
+            <strong>${impact.efficiencyPct}%</strong>
+            <span>useful share</span>
+          </div>
+        </div>
+        <div class="usg-impact-story">
+          <span class="usg-impact-kicker">Last ${data.days} days · ${impact.requests.toLocaleString()} model requests</span>
+          <h3>${fmtTok(usefulTokens)} tokens were classified as useful</h3>
+          <p>${fmtTok(impact.wastedTokens)} tokens (${wastePct}%) were flagged as potentially avoidable. Reducing that waste could lower the estimated inference footprint by roughly the same share.</p>
+          <div class="usg-impact-share" aria-label="${impact.efficiencyPct}% useful and ${wastePct}% potentially avoidable">
+            <span class="is-useful" style="width:${impact.efficiencyPct}%"></span>
+            <span class="is-waste" style="width:${wastePct}%"></span>
+          </div>
+          <div class="usg-impact-share-labels"><span>Useful ${impact.efficiencyPct}%</span><span>Potential waste ${wastePct}%</span></div>
+        </div>
+      </div>
 
-    renderUsageChart();
+      <div class="usg-impact-metrics">
+        <article class="usg-impact-metric is-water">
+          <div class="usg-impact-metric-head">
+            <span class="usg-impact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3S6 10 6 15a6 6 0 0 0 12 0c0-5-6-12-6-12Z"/></svg></span>
+            <span>Water</span>
+          </div>
+          <strong>${fmtWater(impact.estimated.waterMl)}</strong>
+          <span class="usg-impact-metric-note">benchmark-equivalent use</span>
+          <div class="usg-impact-saving">${savingText(fmtWater(impact.potentiallyAvoidable.waterMl))}</div>
+        </article>
+        <article class="usg-impact-metric is-energy">
+          <div class="usg-impact-metric-head">
+            <span class="usg-impact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m13 2-9 12h7l-1 8 10-13h-7V2Z"/></svg></span>
+            <span>Electricity</span>
+          </div>
+          <strong>${fmtEnergy(impact.estimated.energyWh)}</strong>
+          <span class="usg-impact-metric-note">benchmark-equivalent use</span>
+          <div class="usg-impact-saving">${savingText(fmtEnergy(impact.potentiallyAvoidable.energyWh))}</div>
+        </article>
+        <article class="usg-impact-metric is-carbon">
+          <div class="usg-impact-metric-head">
+            <span class="usg-impact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 11a7 7 0 0 1-14 0c0-4 3-7 8-9 0 4 2 5 4 6 1 .6 2 1.5 2 3Z"/><path d="M8 20c2-3 4-5 8-7"/></svg></span>
+            <span>Carbon</span>
+          </div>
+          <strong>${fmtCarbon(impact.estimated.carbonG)}</strong>
+          <span class="usg-impact-metric-note">benchmark-equivalent emissions</span>
+          <div class="usg-impact-saving">${savingText(fmtCarbon(impact.potentiallyAvoidable.carbonG))}</div>
+        </article>
+      </div>
 
+      <div class="usg-impact-details">
+        <div class="usg-impact-detail-card">
+          <span class="usg-impact-detail-label">What changes the footprint</span>
+          <h3>Model, reasoning depth, hardware, cooling, and the electric grid</h3>
+          <p>Long agent runs and reasoning models can use far more energy than a median text prompt. Water also changes with cooling design, climate, and how electricity is generated.</p>
+        </div>
+        <div class="usg-impact-detail-card is-action">
+          <span class="usg-impact-detail-label">Best next step</span>
+          <h3>${topWaste ? topWaste.label : "Keep the useful share high"}</h3>
+          <p>${topWaste ? `${topWaste.hint} Addressing this category could remove up to ${fmtTok(topWaste.tokens)} wasted tokens in this range.` : "Metriq did not detect a recurring waste category in this range. Keep prompts scoped and preserve reusable context."}</p>
+        </div>
+      </div>
+
+      <p class="usg-impact-method">
+        Method: ${impact.benchmark.name}, measured at ${impact.benchmark.energyWhPerRequest} Wh, ${impact.benchmark.waterMlPerRequest} mL water, and ${impact.benchmark.carbonGPerRequest} g CO2e per request, scaled by your request count. This is an orientation benchmark, not a provider-specific measurement. Berkeley Lab reports that workload-level water use can vary by more than 10,000x.
+      </p>
+    `;
+  }
+
+  function renderUsageInsights(data) {
     const insights = data.insights || [];
     usageInsights.innerHTML = "";
     if (!insights.length) {
       const p = document.createElement("p");
       p.className = "muted empty-note";
-      p.textContent = "No issues flagged. Usage looks healthy.";
+      p.textContent = "Not enough usage in this window to generate insights yet.";
       usageInsights.append(p);
-    } else {
-      for (const insight of insights) usageInsights.append(renderUsageInsight(insight));
+      return;
     }
+    insights.forEach((insight) => {
+      const div = document.createElement("div");
+      div.className = `usage-insight ${insight.severity}`;
+      div.innerHTML = `<div class="usage-insight-head"><span class="usage-insight-icon">${svgIcon(USG_ICON_PATHS[USG_SEVERITY_ICON[insight.severity]] || USG_ICON_PATHS.flame, "icon-sm")}</span><h3>${insight.title}</h3></div><p>${insight.evidence}</p><p class="usage-insight-action">${insight.action}</p>`;
+      usageInsights.append(div);
+    });
+  }
 
-    const models = data.models || [];
+  function renderUsageModels(data) {
     usageModels.innerHTML = "";
-    for (const model of models) usageModels.append(renderUsageModelRow(model, t.costUSD));
-    renderUsageDonut(models, t.costUSD);
+    (data.models || []).forEach((model) => {
+      const card = document.createElement("div");
+      card.className = "usg-model-card";
+      const top = document.createElement("div");
+      top.className = "usg-model-card-top";
+      const name = document.createElement("span");
+      name.className = "usg-model-name";
+      name.textContent = model.label;
+      const badge = renderSourceBadge(model.source);
+      top.append(name, badge);
+      const modelId = document.createElement("div");
+      modelId.className = "muted usg-model-id";
+      modelId.textContent = model.model;
+      const stats = document.createElement("div");
+      stats.className = "usg-model-card-stats";
+      stats.innerHTML = `<strong>${fmtTok(model.totalTokens)}</strong><span>${usd(model.costUSD)}${model.approximatePricing ? " (approx.)" : ""}</span>`;
+      const meta = document.createElement("div");
+      meta.className = "muted usg-model-card-meta";
+      meta.textContent = `${model.requests} requests · Cache efficiency ${Math.round((model.cacheHitRate || 0) * 100)}%`;
+      card.append(top, modelId, stats, meta);
+      usageModels.append(card);
+    });
+  }
+
+  function getFilteredUsageSessions() {
+    const sessions = latestUsageData?.sessions || [];
+    const q = usageQuery.trim().toLowerCase();
+    if (!q) return sessions;
+    return sessions.filter((session) =>
+      session.sessionId.toLowerCase().includes(q) ||
+      String(session.project || "").toLowerCase().includes(q) ||
+      (session.models || []).some((model) => model.toLowerCase().includes(q))
+    );
+  }
+
+  function renderUsageSessions() {
+    const filtered = getFilteredUsageSessions();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / USG_PAGE_SIZE));
+    usagePage = Math.min(usagePage, totalPages);
+    const paged = filtered.slice((usagePage - 1) * USG_PAGE_SIZE, usagePage * USG_PAGE_SIZE);
 
     usageSessions.innerHTML = "";
-    for (const session of (data.sessions || []).slice(0, 10)) {
-      usageSessions.append(renderUsageSessionRow(session));
-    }
+    usageSessionsEmpty.classList.toggle("hidden", paged.length > 0);
 
-    usageMeta.textContent = `sources: ${(data.sources || []).join(", ")} · last ${data.days}d · updated ${new Date().toLocaleTimeString()}`;
+    paged.forEach((session) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <div class="usg-session-project">${session.project || "No project"}</div>
+          <div class="muted usg-session-sub">${sourceLabel(session.source)} · ${session.sessionId.slice(0, 8)}…</div>
+        </td>
+        <td>${fmtSessionDate(session.startedAt)}</td>
+        <td class="usg-cell-num">${fmtDuration(session.durationMs)}</td>
+        <td class="usg-cell-num">${fmtTok(session.inputTokens)} / ${fmtTok(session.outputTokens)} / ${fmtTok(session.cacheReadTokens)}</td>
+        <td class="usg-cell-num usg-cell-cost">${usd(session.costUSD)}</td>
+        <td class="muted">${(session.models || []).join(", ")}</td>
+      `;
+      usageSessions.append(tr);
+    });
+
+    const from = filtered.length ? (usagePage - 1) * USG_PAGE_SIZE + 1 : 0;
+    const to = Math.min(usagePage * USG_PAGE_SIZE, filtered.length);
+    usageSessionsSummary.textContent = `Showing ${from} to ${to} of ${filtered.length} sessions`;
+    usagePageInfo.textContent = `${usagePage} / ${totalPages}`;
+    usagePagePrev.disabled = usagePage <= 1;
+    usagePageNext.disabled = usagePage >= totalPages;
+  }
+
+  function renderUsageEmpty(data) {
+    const detectedSources = data.detectedSources || [];
+    usageEmptyTitle.textContent = `No ${sourceLabel(selectedUsageSource)} usage in this range`;
+    usageEmptyBody.textContent = emptyStateMessage(selectedUsageSource, detectedSources);
+    usageDetectedSources.innerHTML = "";
+    usageDetectedSources.classList.toggle("hidden", detectedSources.length === 0);
+    detectedSources.forEach((source) => usageDetectedSources.append(renderSourceBadge(source)));
+  }
+
+  function renderUsageMeta(data) {
+    usageMeta.textContent = `Imported from local ${(data.sources || []).map((source) => sourceLabel(source)).join(" and ")} logs at ${fmtSessionDate(data.generatedAt)}. All parsing happens on this machine — nothing is uploaded.`;
+  }
+
+  function applyUsageData(data) {
+    const available = Boolean(data && data.available);
+    usageTitle.textContent = `${sourceLabel(selectedUsageSource)} Usage`;
+    renderUsageSourceTabs(data.detectedSources || []);
+    usageEmpty.classList.toggle("hidden", available);
+    usageContent.classList.toggle("hidden", !available);
+    if (!available) {
+      renderUsageEmpty(data || {});
+      latestUsageData = null;
+      return;
+    }
+    latestUsageData = data;
+    renderUsageBanners(data);
+    renderUsageHeadline(data);
+    renderUsageChart(data);
+    renderUsageLimits(data);
+    renderCurrentSession(data);
+    renderUsageImpact(data);
+    renderUsageInsights(data);
+    renderUsageModels(data);
+    renderUsageSessions();
+    renderUsageMeta(data);
+  }
+
+  async function refreshUsage() {
+    const data = await window.metriq.getUsage(usageDays, selectedUsageSource);
+    applyUsageData(data);
   }
 
   for (const btn of usageRangeButtons) {
     btn.addEventListener("click", () => {
       usageDays = parseInt(btn.dataset.days, 10);
       for (const b of usageRangeButtons) b.classList.toggle("is-active", b === btn);
+      usagePage = 1;
       refreshUsage();
     });
   }
 
+  usageSearch?.addEventListener("input", (event) => {
+    usageQuery = event.target.value;
+    usagePage = 1;
+    renderUsageSessions();
+  });
+  usagePagePrev?.addEventListener("click", () => {
+    usagePage = Math.max(1, usagePage - 1);
+    renderUsageSessions();
+  });
+  usagePageNext?.addEventListener("click", () => {
+    const totalPages = Math.max(1, Math.ceil(getFilteredUsageSessions().length / USG_PAGE_SIZE));
+    usagePage = Math.min(totalPages, usagePage + 1);
+    renderUsageSessions();
+  });
   btnRefreshUsage?.addEventListener("click", () => refreshUsage());
 
   window.metriq.onAuthSuccess((session) => {

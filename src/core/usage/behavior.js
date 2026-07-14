@@ -154,6 +154,18 @@ function analyzeWaste(turns) {
   const buckets = Object.fromEntries(
     WASTE_BUCKETS.map((b) => [b.key, { ...b, tokens: 0, turns: 0 }])
   );
+  const wastedByIntent = new Map();
+
+  function recordWaste(bucketKey, turn, tokens) {
+    const amount = Math.max(0, Math.round(tokens || 0));
+    if (!amount) return;
+    buckets[bucketKey].tokens += amount;
+    buckets[bucketKey].turns += 1;
+    wastedByIntent.set(
+      turn.intent,
+      (wastedByIntent.get(turn.intent) || 0) + amount
+    );
+  }
 
   turns.forEach((turn, i) => {
     const prev = i > 0 ? turns[i - 1] : null;
@@ -161,8 +173,7 @@ function analyzeWaste(turns) {
     // 1. Rework: this turn corrects the previous one, so the previous turn's
     //    output was thrown away and this turn re-does it.
     if (turn.prompt && CORRECTION_RE.test(turn.prompt.trim())) {
-      buckets.rework.tokens += turn.totalTokens + (prev ? prev.outputTokens : 0);
-      buckets.rework.turns += 1;
+      recordWaste("rework", turn, turn.totalTokens + (prev ? prev.outputTokens : 0));
       return; // a correction turn isn't double-counted in other buckets
     }
 
@@ -173,16 +184,14 @@ function analyzeWaste(turns) {
       prev.prompt &&
       promptSimilarity(turn.prompt, prev.prompt) >= 0.8
     ) {
-      buckets.retries.tokens += turn.totalTokens;
-      buckets.retries.turns += 1;
+      recordWaste("retries", turn, turn.totalTokens);
       return;
     }
 
     // 3. Cache misses: past the first turn the conversation context already
     //    exists, so uncached input tokens are context re-sent at full price.
     if (i > 0 && turn.inputTokens > 0 && turn.cacheReadTokens > 0) {
-      buckets.uncachedContext.tokens += turn.inputTokens;
-      buckets.uncachedContext.turns += 1;
+      recordWaste("uncachedContext", turn, turn.inputTokens);
     }
 
     // 4. Vague exploration: a tiny unscoped prompt where input dwarfs output
@@ -197,16 +206,15 @@ function analyzeWaste(turns) {
       !FILE_REF_RE.test(turn.prompt) &&
       contextIn > turn.outputTokens * 4
     ) {
-      buckets.vagueExploration.tokens += contextIn - turn.outputTokens * 4;
-      buckets.vagueExploration.turns += 1;
+      recordWaste("vagueExploration", turn, contextIn - turn.outputTokens * 4);
     }
   });
 
-  const out = WASTE_BUCKETS.map((b) => ({
+  const waste = WASTE_BUCKETS.map((b) => ({
     ...buckets[b.key],
     tokens: Math.round(buckets[b.key].tokens),
   })).filter((b) => b.tokens > 0);
-  return out;
+  return { waste, wastedByIntent };
 }
 
 // --- Public entry -------------------------------------------------------------
@@ -241,14 +249,21 @@ export function analyzeSessionBehavior(records, options = {}) {
     b.turns += 1;
   }
 
+  const wasteAnalysis = analyzeWaste(turns);
   const intents = INTENTS.map((meta) => {
     const b = byIntent.get(meta.key);
     if (!b) return null;
     const pctOfSession = b.tokens / sessionTokens;
+    const wastedTokens = Math.min(
+      b.tokens,
+      wasteAnalysis.wastedByIntent.get(meta.key) || 0
+    );
     return {
       key: meta.key,
       label: meta.label,
       tokens: b.tokens,
+      usefulTokens: b.tokens - wastedTokens,
+      wastedTokens,
       turns: b.turns,
       pctOfSession: Math.round(pctOfSession * 1000) / 10,
       pctOfLimit:
@@ -256,15 +271,53 @@ export function analyzeSessionBehavior(records, options = {}) {
     };
   }).filter(Boolean);
 
-  const waste = analyzeWaste(turns);
-  const wastedTokens = waste.reduce((sum, b) => sum + b.tokens, 0);
+  // Multiple waste heuristics can overlap on one turn. Cap each intent at its
+  // real token count, then scale the cause rows to that same honest total.
+  const wastedTokens = intents.reduce((sum, intent) => sum + intent.wastedTokens, 0);
+  const usefulTokens = sessionTokens - wastedTokens;
+  const rawWasteTokens = wasteAnalysis.waste.reduce((sum, item) => sum + item.tokens, 0);
+  const wasteScale = rawWasteTokens > 0 ? wastedTokens / rawWasteTokens : 0;
+  const scaledWaste = wasteAnalysis.waste.map((item) => {
+    const exactTokens = item.tokens * wasteScale;
+    return { ...item, tokens: Math.floor(exactTokens), fraction: exactTokens % 1 };
+  });
+  let wasteRemainder = wastedTokens - scaledWaste.reduce((sum, item) => sum + item.tokens, 0);
+  [...scaledWaste]
+    .sort((a, b) => b.fraction - a.fraction)
+    .forEach((item) => {
+      if (wasteRemainder <= 0) return;
+      item.tokens += 1;
+      wasteRemainder -= 1;
+    });
+  const waste = scaledWaste
+    .map(({ fraction, ...item }) => ({
+      ...item,
+      pctOfWaste: wastedTokens > 0
+        ? Math.round((item.tokens / wastedTokens) * 1000) / 10
+        : 0,
+    }))
+    .filter((item) => item.tokens > 0);
+  const usefulBreakdown = intents
+    .filter((intent) => intent.usefulTokens > 0)
+    .map((intent) => ({
+      key: intent.key,
+      label: intent.label,
+      tokens: intent.usefulTokens,
+      turns: intent.turns,
+      pctOfUseful: usefulTokens > 0
+        ? Math.round((intent.usefulTokens / usefulTokens) * 1000) / 10
+        : 0,
+    }))
+    .sort((a, b) => b.tokens - a.tokens);
 
   return {
     turns: turns.length,
     classifiedTurns: turns.filter((t) => t.prompt).length,
     sessionTokens,
+    usefulTokens,
     sessionUsedPctOfLimit: usedPct,
     intents,
+    usefulBreakdown,
     waste,
     wastedTokens,
     wastedPct: Math.round((wastedTokens / sessionTokens) * 1000) / 10,

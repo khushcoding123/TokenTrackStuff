@@ -18,8 +18,11 @@ const { PromptWatcher, looksLikePrompt } = require("./prompt-watcher");
 // stats in usage-stats.js above, which only track this app's own CTA clicks).
 const { getClaudeDirs, loadClaudeRecords } = require("../../src/core/usage/claude.js");
 const { getCodexSessionsDir, loadCodexUsage } = require("../../src/core/usage/codex.js");
+const { getCursorProjectsDir, loadCursorRecords } = require("../../src/core/usage/cursor.js");
 const { aggregate } = require("../../src/core/usage/aggregate.js");
 const { generateInsights } = require("../../src/core/usage/insights.js");
+const { analyzeCurrentSession, analyzeSessionBehavior } = require("../../src/core/usage/behavior.js");
+const { estimateUsageImpact } = require("../../src/core/usage/impact.js");
 
 const WEB_BASE_URL = process.env.METRIQ_WEB_URL || "https://tokenpilot-mocha.vercel.app";
 const CAPTURE_HOTKEY = process.env.METRIQ_CAPTURE_HOTKEY || "CommandOrControl+Shift+M";
@@ -881,37 +884,192 @@ if (!gotSingleInstanceLock) {
 
   const USAGE_VALID_DAYS = new Set([7, 30, 90]);
 
-  function buildUsagePayload(days) {
+  function detectUsageSources() {
     const sources = [];
     if (getClaudeDirs().length) sources.push("claude-code");
     if (getCodexSessionsDir()) sources.push("codex");
-    if (!sources.length) return { available: false, sources: [] };
+    if (getCursorProjectsDir()) sources.push("cursor");
+    return sources;
+  }
+
+  function filterSelectedUsage(records, selectedSource) {
+    if (selectedSource === "all") return records;
+    return records.filter((record) => record.source === selectedSource);
+  }
+
+  function dayKey(timestamp) {
+    const date = new Date(timestamp);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+  }
+
+  function buildDailyBehavior(records, rateLimits = null) {
+    const byDay = new Map();
+    for (const record of records) {
+      const key = dayKey(record.timestamp);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(record);
+    }
+    return Object.fromEntries(
+      [...byDay.entries()].map(([key, dayRecords]) => {
+        const bySession = new Map();
+        for (const record of dayRecords) {
+          const sessionKey = `${record.source}:${record.sessionId || "unknown"}`;
+          if (!bySession.has(sessionKey)) bySession.set(sessionKey, []);
+          bySession.get(sessionKey).push(record);
+        }
+        const behaviors = [...bySession.values()]
+          .map((sessionRecords) => analyzeSessionBehavior(sessionRecords, { rateLimits }))
+          .filter(Boolean);
+        const sessionTokens = behaviors.reduce((sum, behavior) => sum + behavior.sessionTokens, 0);
+        const wastedTokens = behaviors.reduce((sum, behavior) => sum + behavior.wastedTokens, 0);
+        const usefulTokens = Math.max(0, sessionTokens - wastedTokens);
+        const usefulByIntent = new Map();
+        const wasteByCause = new Map();
+
+        behaviors.forEach((behavior) => {
+          behavior.usefulBreakdown.forEach((intent) => {
+            const current = usefulByIntent.get(intent.key) || {
+              key: intent.key,
+              label: intent.label,
+              tokens: 0,
+              turns: 0,
+            };
+            current.tokens += intent.tokens;
+            current.turns += intent.turns;
+            usefulByIntent.set(intent.key, current);
+          });
+          behavior.waste.forEach((waste) => {
+            const current = wasteByCause.get(waste.key) || {
+              key: waste.key,
+              label: waste.label,
+              hint: waste.hint,
+              tokens: 0,
+              turns: 0,
+            };
+            current.tokens += waste.tokens;
+            current.turns += waste.turns;
+            wasteByCause.set(waste.key, current);
+          });
+        });
+
+        const usefulBreakdown = [...usefulByIntent.values()]
+          .map((intent) => ({
+            ...intent,
+            pctOfUseful: usefulTokens > 0
+              ? Math.round((intent.tokens / usefulTokens) * 1000) / 10
+              : 0,
+          }))
+          .sort((a, b) => b.tokens - a.tokens);
+        const wasteBreakdown = [...wasteByCause.values()]
+          .map((waste) => ({
+            ...waste,
+            pctOfWaste: wastedTokens > 0
+              ? Math.round((waste.tokens / wastedTokens) * 1000) / 10
+              : 0,
+          }))
+          .sort((a, b) => b.tokens - a.tokens);
+        return [
+          key,
+          behaviors.length
+            ? {
+                wastedTokens,
+                usefulTokens,
+                wastedPct: sessionTokens > 0
+                  ? Math.round((wastedTokens / sessionTokens) * 1000) / 10
+                  : 0,
+                usefulPct: sessionTokens > 0
+                  ? Math.round((usefulTokens / sessionTokens) * 1000) / 10
+                  : 0,
+                usefulBreakdown,
+                wasteBreakdown,
+              }
+            : {
+                wastedTokens: 0,
+                usefulTokens: 0,
+                wastedPct: 0,
+                usefulPct: 0,
+                usefulBreakdown: [],
+                wasteBreakdown: [],
+              },
+        ];
+      })
+    );
+  }
+
+  function buildUsagePayload(days, selectedSource = "claude-code") {
+    const detectedSources = detectUsageSources();
+    if (!detectedSources.length) {
+      return { available: false, sources: [], detectedSources: [], selectedSource };
+    }
 
     const since = new Date(Date.now() - (days + 2) * 24 * 60 * 60 * 1000);
     const records = [];
     let rateLimits = null;
-    if (sources.includes("claude-code")) records.push(...loadClaudeRecords({ since }));
-    if (sources.includes("codex")) {
+    if (detectedSources.includes("claude-code")) records.push(...loadClaudeRecords({ since }));
+    if (detectedSources.includes("codex")) {
       const codex = loadCodexUsage({ since });
       records.push(...codex.records);
       rateLimits = codex.rateLimits;
     }
-    if (!records.length) return { available: false, sources };
+    if (detectedSources.includes("cursor")) {
+      records.push(...loadCursorRecords({ since }));
+    }
 
-    const agg = aggregate(records, { days });
+    const scopedRecords = filterSelectedUsage(records, selectedSource);
+    const telemetrySources = [...new Set(scopedRecords.map((record) => record.source))];
+
+    if (!scopedRecords.length) {
+      return {
+        available: false,
+        sources: [],
+        detectedSources,
+        selectedSource,
+        hasAnyTelemetry: records.length > 0,
+      };
+    }
+
+    const agg = aggregate(scopedRecords, { days });
+    const dailyBehavior = buildDailyBehavior(scopedRecords, rateLimits);
+    const daily = agg.daily.map((day) => ({
+      ...day,
+      behavior: dailyBehavior[day.date] || {
+        wastedTokens: 0,
+        usefulTokens: day.totalTokens || 0,
+        wastedPct: 0,
+        usefulPct: day.totalTokens ? 100 : 0,
+        usefulBreakdown: [],
+        wasteBreakdown: [],
+      },
+    }));
+    const requestCount = (agg.models || []).reduce((sum, model) => sum + (model.requests || 0), 0);
+    const wastedTokens = daily.reduce(
+      (sum, day) => sum + (day.behavior?.wastedTokens || 0),
+      0
+    );
     return {
       available: true,
-      sources,
+      sources: telemetrySources,
+      detectedSources,
       days,
+      selectedSource,
       generatedAt: new Date().toISOString(),
-      rateLimits,
+      rateLimits: selectedSource === "all" || selectedSource === "codex" ? rateLimits : null,
       insights: generateInsights(agg, rateLimits),
+      currentSession: analyzeCurrentSession(scopedRecords, { rateLimits }),
+      impact: estimateUsageImpact({
+        requests: requestCount,
+        totalTokens: agg.totals.totalTokens,
+        wastedTokens,
+      }),
       ...agg,
+      daily,
     };
   }
 
-  ipcMain.handle("usage:get", (_event, days) => {
+  ipcMain.handle("usage:get", (_event, days, selectedSource) => {
     const d = USAGE_VALID_DAYS.has(days) ? days : 30;
-    return buildUsagePayload(d);
+    return buildUsagePayload(d, selectedSource || "claude-code");
   });
 }

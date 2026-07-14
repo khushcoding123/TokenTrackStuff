@@ -83,5 +83,5 @@ contextBridge.exposeInMainWorld("metriq", {
 
   getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
 
-  getUsage: (days) => ipcRenderer.invoke("usage:get", days),
+  getUsage: (days, source) => ipcRenderer.invoke("usage:get", days, source),
 });
