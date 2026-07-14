@@ -218,7 +218,7 @@ function createCaptureWindow(opts = {}) {
     alwaysOnTop: true,
     frame: true,
     skipTaskbar: true,
-    title: "Metriq — Suggestion",
+    title: "Metriq Suggestion",
     backgroundColor: "#0B0F14",
     show: false,
     webPreferences: {
@@ -510,7 +510,7 @@ if (!gotSingleInstanceLock) {
     clearSession();
     updateTrayMenu();
     mainWindow?.webContents.send("auth:logged-out");
-    const err = new Error("Your session expired — please sign in again.");
+    const err = new Error("Your session expired. Please sign in again.");
     err.code = "NOT_AUTHENTICATED";
     return err;
   }
@@ -590,9 +590,9 @@ if (!gotSingleInstanceLock) {
           if (!err) return resolve(dir);
           fs.rmSync(dir, { recursive: true, force: true });
           if (err.code === "ENOENT") {
-            reject(new Error("Git isn't installed on this machine — needed to clone repos."));
+            reject(new Error("Git isn't installed on this machine. It's needed to clone repositories."));
           } else {
-            reject(new Error("Couldn't clone that repository — check the URL and that it's public."));
+            reject(new Error("Couldn't clone that repository. Check the URL and that it's public."));
           }
         }
       );
@@ -632,7 +632,7 @@ if (!gotSingleInstanceLock) {
   ipcMain.handle("projects:link-github", async (_event, repoUrl) => {
     const parsed = parseGithubRepo(repoUrl);
     if (!parsed) {
-      throw new Error("That doesn't look like a GitHub repo URL — try https://github.com/owner/repo.");
+      throw new Error("That doesn't look like a GitHub repository URL. Try https://github.com/owner/repo.");
     }
     const { owner, repo } = parsed;
     const cloneDir = await cloneGithubRepo(owner, repo);

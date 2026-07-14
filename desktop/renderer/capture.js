@@ -24,7 +24,7 @@
 
   // Show what the recommendation is scoped to (connected repo, if any).
   const repoUrl = await window.metriq.getCaptureRepoUrl();
-  contextEl.textContent = repoUrl ? `Scoped to ${shortRepo(repoUrl)}` : "No repo connected";
+  contextEl.textContent = repoUrl ? `Scoped to ${shortRepo(repoUrl)}` : "No repository connected";
 
   let debounceTimer = null;
   let latestImproved = "";
@@ -39,9 +39,9 @@
     resultEl.classList.remove("hidden");
 
     const a = rec.analysis || {};
-    ratingEl.textContent = a.rating || "—";
+    ratingEl.textContent = a.rating || "N/A";
     ratingEl.className = `capture-badge rating-${a.rating || "moderate"}`;
-    scoreEl.textContent = `breadth ${a.breadthScore ?? "—"}/100`;
+    scoreEl.textContent = `breadth ${a.breadthScore ?? 0}/100`;
 
     const s = rec.tokenSaving || {};
     savingsEl.textContent = s.savedTokens > 0 ? `saves ~${s.savedTokens} tokens (${s.savedPct}%)` : "";
@@ -104,7 +104,7 @@
   btnApply.addEventListener("click", async () => {
     if (!latestImproved) return;
     await window.metriq.applyPrompt(latestImproved, latestStats);
-    btnApply.textContent = "Applied — paste with ⌘/Ctrl+V";
+    btnApply.textContent = "Applied. Paste with ⌘/Ctrl+V";
     setTimeout(() => (btnApply.textContent = "Approve & apply"), 1600);
   });
 

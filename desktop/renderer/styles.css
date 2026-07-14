@@ -374,6 +374,11 @@ body {
   height: 16px;
 }
 
+.icon-xs {
+  width: 12px;
+  height: 12px;
+}
+
 /* --- Logged-out view ------------------------------------------------- */
 
 .view {
@@ -482,41 +487,6 @@ h2 {
   font-size: var(--text-sm);
   color: var(--on-surface-variant);
   margin-top: var(--space-2);
-}
-
-/* --- Shared identity/avatar (also used by capture window indirectly via
-   .brand overrides, and directly by the settings page) ------------------ */
-
-.identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-  text-align: left;
-}
-
-.avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-full);
-  background: var(--primary-container);
-  border: 1px solid var(--border);
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: var(--text-2xl);
-  flex-shrink: 0;
-}
-
-.identity-name {
-  font-weight: 700;
-  font-size: var(--text-xl);
-}
-
-.identity-email {
-  font-size: var(--text-md);
 }
 
 /* --- App shell: sidebar (icon rail) + main column ----------------------
@@ -2452,70 +2422,144 @@ button.ov-insight:hover {
   color: var(--text-primary);
 }
 
-/* --- Settings ------------------------------------------------------------ */
+/* --- Settings --------------------------------------------------------------
+   Each section is its own elevated set-card (Account, Appearance, Capture &
+   Integrations, Accessibility, About) instead of one long list — own set-*
+   namespace throughout. The only pieces intentionally reused from elsewhere
+   are the app's standard button trio (.ov-btn-primary/.ov-btn-secondary/
+   .link-btn) and the .alert error banner, so Settings' buttons look and
+   behave exactly like every other page's. .a11y-list/.a11y-row keep their
+   existing names (renderer.js's initAccessibility() creates them), just
+   restyled here as individually elevated mini-cards.
+   ========================================================================== */
 
-/* Settings runs noticeably larger than other pages — it's a short page
-   with little content, so under-sized rows left a lot of dead space below
-   (looked like the page had "stopped halfway" / broken). Bigger type,
-   padding, and inter-block spacing make the existing content actually
-   fill the page instead of adding more text just to pad it out. */
-
-.settings-card {
-  background: var(--surface-1);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: var(--space-6);
+.set-header {
   margin-bottom: var(--space-5);
 }
 
-.identity-info {
+.set-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.set-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.set-section-title h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.set-section-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Directly follows .set-section-title when a section has a one-line
+   sub-caption (Accessibility) — tightens the title's bottom margin so the
+   two read as one header block instead of two separately-spaced lines. */
+.set-section-title:has(+ .set-section-sub) {
+  margin-bottom: var(--space-1);
+}
+
+.set-section-sub {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
+/* --- Account card ---------------------------------------------------------- */
+
+.set-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.set-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--primary-container);
+  border: 1px solid var(--border-default);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--text-2xl);
+  flex-shrink: 0;
+}
+
+.set-identity-info {
   flex: 1;
   min-width: 0;
 }
 
-.identity-name-row {
+.set-name-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
+  margin-bottom: 2px;
 }
 
-.icon-btn {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 6px;
-  display: flex;
-  border-radius: var(--radius-sm);
-  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+.set-identity-name {
+  font-weight: 700;
+  font-size: var(--text-xl);
 }
 
-.icon-btn:hover {
+.set-badge-signed-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--primary-container);
   color: var(--accent-primary);
-  background: var(--surface-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
 }
 
+.set-identity-email {
+  font-size: var(--text-md);
+}
+
+.set-edit-btn {
+  flex-shrink: 0;
+}
+
+/* Reuses the pre-existing #settings-name-form markup/ids, just restyled to
+   sit inline where the name row was, matching the new input language. */
 .settings-name-form {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin: var(--space-2) 0;
+  margin-bottom: 2px;
 }
 
 .settings-name-form.hidden {
   display: none;
 }
 
-.settings-name-form .pill-action {
-  font-size: var(--text-md);
-  padding: 10px 20px;
-}
+/* --- Shared input primitive (name edit + GitHub repo) ----------------------- */
 
-.settings-name-form .link-btn {
-  font-size: var(--text-md);
-}
-
-.settings-name-input {
+.set-input {
   flex: 1;
   min-width: 0;
   background: var(--surface-1);
@@ -2523,47 +2567,104 @@ button.ov-insight:hover {
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: var(--text-lg);
-  padding: 10px 14px;
+  font-size: var(--text-md);
+  padding: 11px 14px;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
-.settings-name-input:focus {
+.set-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.set-input:focus {
   outline: none;
   border-color: var(--accent-secondary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-secondary) 25%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-secondary) 20%, transparent);
 }
 
-.settings-list {
+/* --- Setting rows: icon + title/description left, control right ----------- */
+
+.set-rows {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  background: var(--border-default);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  margin-bottom: var(--space-2);
+  gap: var(--space-1);
 }
 
-.settings-row {
+.set-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface-1);
-  padding: var(--space-5) var(--space-6);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-1);
+  border-radius: var(--radius-md);
+  transition: background var(--duration-fast) ease;
 }
 
-.settings-row-label {
-  font-size: var(--text-lg);
+.set-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.set-row:hover {
+  background: var(--surface-hover);
+}
+
+.set-row-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.set-row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
   color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.settings-row-value {
+.set-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.set-row-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.set-row-desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.set-row-value {
+  flex-shrink: 0;
   font-family: var(--font-mono);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   font-weight: 500;
   color: var(--text-primary);
 }
 
-.theme-toggle-btn {
+.set-kbd {
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: var(--text-sm);
+}
+
+/* --- Theme pill button ------------------------------------------------------ */
+
+.set-toggle-pill {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -2571,86 +2672,444 @@ button.ov-insight:hover {
   border: 1px solid var(--border-default);
   color: var(--text-primary);
   border-radius: var(--radius-full);
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: 600;
-  padding: 10px 18px;
+  padding: 8px 16px;
   cursor: pointer;
   font-family: inherit;
+  flex-shrink: 0;
+  transition: border-color var(--duration-fast) ease, color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-enter);
+}
+
+.set-toggle-pill:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.set-toggle-pill:active {
+  transform: none;
+}
+
+.set-toggle-pill:focus-visible {
+  outline: 2px solid var(--accent-secondary);
+  outline-offset: 2px;
+}
+
+/* --- Switch control (Auto-capture) ------------------------------------------ */
+
+.set-switch-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.set-switch-state {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  min-width: 26px;
+  text-align: right;
+}
+
+.set-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.set-switch::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform var(--duration-base) var(--ease-enter), background var(--duration-fast) ease;
+}
+
+.set-switch[aria-checked="true"] {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.set-switch[aria-checked="true"]::after {
+  transform: translateX(18px);
+  background: var(--on-accent-primary);
+}
+
+.set-switch:focus-visible {
+  outline: 2px solid var(--accent-secondary);
+  outline-offset: 2px;
+}
+
+/* --- Permission pill (clickable status) ------------------------------------- */
+
+.set-permission-pill {
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
   transition: border-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
-.theme-toggle-btn:hover {
+.set-permission-pill:hover {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
+}
+
+/* --- GitHub repo block ------------------------------------------------------- */
+
+.set-repo-block {
+  margin-top: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.set-repo-block .set-row-title {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
+.set-repo-input-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.set-repo-status {
+  font-size: var(--text-sm);
+}
+
+.set-disclosure {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.set-external-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+/* --- Accessibility: each option as its own premium setting, not a row in a
+   giant table — 2-up grid of elevated cards on wide windows, one column on
+   the default narrow width. Reuses .tool-row/.tool-row-icon/.tool-row-input/
+   .tool-row-toggle as-is (shared switch primitive with Tools, see styles.css
+   §Tools) — only .a11y-list/.a11y-row (Accessibility-only) are overridden. */
+
+.a11y-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.a11y-row {
+  align-items: flex-start;
+  min-height: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-enter), box-shadow var(--duration-fast) ease;
+}
+
+.a11y-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.a11y-row .tool-row-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.a11y-row .tool-row-toggle {
+  margin-top: 2px;
 }
 
 /* Destructive actions get their own zone, spatially separated from
    ordinary settings rows (destructive-nav-separation guidance) — a divider
    plus generous top spacing, not just a color change. */
 .settings-danger-zone {
-  margin-top: var(--space-8);
-  padding-top: var(--space-8);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
   border-top: 1px solid var(--border-subtle);
 }
 
 #page-settings .btn-danger-outline {
-  font-size: var(--text-lg);
-  padding: 16px 20px;
+  font-size: var(--text-md);
+  padding: 12px 18px;
 }
 
-/* --- Usage ---------------------------------------------------------------- */
+/* ==========================================================================
+   Usage — an executive analytics dashboard (Stripe/Linear/Datadog
+   territory), not a stacked report. Own usg-* namespace for layout/cards;
+   .usage-* names are kept where renderer.js's refreshUsage()/etc. build
+   elements with those exact classes, just restyled here.
+   ========================================================================== */
 
-.usage-range {
+.usg-header {
   display: flex;
-  gap: var(--space-2);
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
   margin-bottom: var(--space-5);
 }
 
+.usg-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.usg-refresh-btn {
+  flex-shrink: 0;
+}
+
+/* --- Range selector --------------------------------------------------------- */
+
+.usg-range {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 3px;
+}
+
 .usage-range-btn {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--on-surface-variant);
-  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
   font-size: var(--text-sm);
   font-weight: 600;
-  padding: var(--space-2);
+  padding: 7px 14px;
   cursor: pointer;
   font-family: inherit;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.usage-range-btn:hover {
+  color: var(--text-primary);
 }
 
 .usage-range-btn.is-active {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-container);
+  background: var(--surface-1);
+  color: var(--accent-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* --- Shared card + metrics --------------------------------------------------- */
+
+.usg-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.usg-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.usg-metric {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-enter),
+    box-shadow var(--duration-fast) ease;
+}
+
+.usg-metric:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.usg-metric-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.usg-metric-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.usg-metric-icon .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.usg-metric-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.usg-metric-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-metric);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+
+.usg-metric-sub {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* --- Chart ------------------------------------------------------------------- */
+
+.usg-chart-card {
+  padding-bottom: var(--space-5);
+}
+
+.usg-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.usg-chart-header h2 {
+  margin: 0 0 2px;
+  font-size: var(--text-lg);
+  font-weight: 700;
 }
 
 .usage-daily-caption {
+  margin: 0;
   font-size: var(--text-xs);
-  margin: 0 0 var(--space-2);
 }
 
-.usage-daily-peak {
+.usg-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.usg-chip {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.usg-chip:empty {
+  display: none;
+}
+
+.usg-chip-accent {
+  color: var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  background: var(--primary-container);
+}
+
+.usg-chart-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin-bottom: var(--space-4);
+  width: fit-content;
+}
+
+.usg-chart-tab {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-family: inherit;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.usg-chart-tab:hover {
+  color: var(--text-primary);
+}
+
+.usg-chart-tab.is-active {
+  background: var(--surface-1);
+  color: var(--accent-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .usage-bars {
   display: flex;
   align-items: flex-end;
-  gap: 3px;
+  gap: 4px;
   height: 90px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-3);
+}
+
+.usg-bars-lg {
+  height: 240px;
+  gap: 5px;
 }
 
 .usage-daily-labels {
   display: flex;
   justify-content: space-between;
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
@@ -2659,10 +3118,22 @@ button.ov-insight:hover {
 .usage-bar {
   flex: 1;
   min-height: 2px;
-  background: var(--primary);
-  border-radius: 2px 2px 0 0;
-  opacity: 0.85;
+  background: var(--accent-primary);
+  border-radius: 3px 3px 0 0;
+  opacity: 0.55;
+  transition: opacity var(--duration-fast) ease;
 }
+
+.usage-bar:hover {
+  opacity: 1;
+}
+
+.usage-bar.is-today {
+  opacity: 1;
+  background: var(--accent-secondary);
+}
+
+/* --- AI Recommendations ------------------------------------------------------ */
 
 .usage-insights {
   display: flex;
@@ -2671,72 +3142,296 @@ button.ov-insight:hover {
 }
 
 .usage-insight {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-enter);
+}
+
+.usage-insight:hover {
+  transform: translateY(-1px);
+}
+
+.usage-insight.high {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border-default));
+  background: color-mix(in srgb, var(--warning) 6%, var(--surface-1));
+}
+
+.usage-insight.info {
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--border-default));
+  background: var(--primary-container);
+}
+
+.usage-insight-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.usage-insight-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.usage-insight.high .usage-insight-icon,
+.usage-insight.medium .usage-insight-icon {
+  color: var(--warning);
+}
+
+.usage-insight.info .usage-insight-icon {
+  color: var(--accent-primary);
 }
 
 .usage-insight h3 {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: 700;
 }
 
 .usage-insight p {
   margin: var(--space-1) 0 0;
   font-size: var(--text-sm);
-  color: var(--on-surface-variant);
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .usage-insight .usage-insight-action {
-  color: var(--on-background);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* --- Usage breakdown: model bars + distribution donut ------------------------ */
+
+.usg-breakdown {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: var(--space-6);
+  align-items: center;
 }
 
 .usage-models {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
+  gap: var(--space-4);
 }
 
 .usage-model-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .usage-model-label {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--text-sm);
 }
 
+.usg-model-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.usg-model-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.usg-model-name {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.usg-model-pct {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
 .usage-model-label .cost {
+  font-family: var(--font-mono);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
+.usg-model-meta {
+  font-size: var(--text-xs);
+  margin-left: 32px;
+}
+
 .usage-model-bar-track {
-  height: 6px;
+  height: 7px;
   border-radius: var(--radius-full);
-  background: var(--surface-container);
+  background: var(--surface-2);
   overflow: hidden;
 }
 
 .usage-model-bar-fill {
   height: 100%;
-  background: var(--primary);
+  background: var(--accent-primary);
   border-radius: var(--radius-full);
+  transition: width var(--duration-slow) var(--ease-enter);
+}
+
+.usg-distribution {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+}
+
+.usg-donut {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 50%;
+  flex-shrink: 0;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 34px), #000 calc(100% - 34px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 34px), #000 calc(100% - 34px));
+}
+
+.usg-donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.usg-donut-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.usg-donut-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* --- Recent sessions table ---------------------------------------------------- */
+
+.usg-table-wrap {
+  overflow-x: auto;
+}
+
+.usg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.usg-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.usg-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.usg-table tbody tr {
+  transition: background var(--duration-fast) ease;
+}
+
+.usg-table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+.usg-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.usg-cell-project {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  white-space: normal;
+}
+
+.usg-row-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.usg-cell-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.usg-cell-cost {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.usg-source-badge {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.usg-source-codex {
+  background: color-mix(in srgb, var(--accent-secondary) 14%, transparent);
+  color: var(--accent-secondary);
+}
+
+.usg-source-claude-code {
+  background: var(--primary-container);
+  color: var(--accent-primary);
 }
 
 .usage-meta {
   font-size: var(--text-xs);
   text-align: center;
   margin-top: var(--space-2);
+}
+
+@media (max-width: 760px) {
+  .usg-breakdown {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --- Theme-flip wipe animation ------------------------------------------
@@ -3169,4 +3864,348 @@ button.ov-insight:hover {
 .ps-history-restore:hover {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
+}
+
+/* ==========================================================================
+   Sustainability — a premium analytics dashboard, not an environmental
+   campaign page: metric cards mirror Overview's ov-metric language, one
+   restrained accent card ties the numbers into a plain-language summary,
+   and the history section gets elegant skeleton chart placeholders instead
+   of blank space until real charting is built. Own sus-* namespace; reuses
+   the shared .empty-state/.activity-list bones (Usage/Prompt Studio history
+   also depend on those) by layering additional sus-* classes on top rather
+   than editing the shared rules.
+   ========================================================================== */
+
+.sus-header {
+  margin-bottom: var(--space-2);
+}
+
+.sus-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.sus-metric {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-enter),
+    box-shadow var(--duration-fast) ease;
+}
+
+.sus-metric:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.sus-metric-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sus-metric-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sus-metric-icon .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sus-metric-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  line-height: 1.3;
+}
+
+.sus-metric-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-metric);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+
+.sus-metric-sub {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.sus-metric-accent {
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  background: var(--primary-container);
+}
+
+.sus-metric-accent:hover {
+  border-color: var(--accent-primary);
+}
+
+.sus-metric-accent .sus-metric-value {
+  color: var(--accent-primary);
+}
+
+.sus-metric-accent .sus-metric-icon {
+  background: color-mix(in srgb, var(--accent-primary) 16%, transparent);
+  color: var(--accent-primary);
+}
+
+/* --- Impact summary card -------------------------------------------------- */
+
+.sus-summary-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+  background-image: radial-gradient(
+    420px 140px at 100% 0%,
+    color-mix(in srgb, var(--accent-primary) 6%, transparent),
+    transparent 70%
+  );
+}
+
+.sus-summary-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sus-summary-body {
+  min-width: 0;
+}
+
+.sus-summary-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.sus-summary-text {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* --- Empty state (adds onto the shared .empty-state) ---------------------- */
+
+.sus-empty {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-10) var(--space-5);
+  gap: var(--space-3);
+}
+
+.sus-empty-decoration {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+      320px 160px at 15% 0%,
+      color-mix(in srgb, var(--accent-primary) 8%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      280px 160px at 85% 100%,
+      color-mix(in srgb, var(--accent-secondary) 6%, transparent),
+      transparent 70%
+    );
+  pointer-events: none;
+}
+
+.sus-empty-icon-frame {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+
+.sus-empty-icon-frame .empty-state-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.sus-empty-text {
+  position: relative;
+  max-width: 42ch;
+}
+
+.sus-empty-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* --- Chart placeholders ---------------------------------------------------- */
+
+.sus-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.sus-chart-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sus-chart-header {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sus-chart-note {
+  margin: 0;
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/* Static, not loading — these charts aren't mid-fetch, they're not built
+   yet ("Coming soon"), so no continuous pulse/shimmer: an infinite loading
+   animation over content that will never resolve is misleading, not just
+   decorative. Each gets one short fade-in on page entry instead. */
+.sus-chart-skeleton {
+  height: 72px;
+  border-radius: var(--radius-sm);
+  animation: sus-chart-in var(--duration-slow) var(--ease-enter);
+}
+
+@keyframes sus-chart-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sus-chart-skeleton-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 0 var(--space-1);
+}
+
+.sus-chart-skeleton-bars span {
+  flex: 1;
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+}
+
+.sus-chart-skeleton-bars span:nth-child(1) { height: 35%; }
+.sus-chart-skeleton-bars span:nth-child(2) { height: 55%; }
+.sus-chart-skeleton-bars span:nth-child(3) { height: 40%; }
+.sus-chart-skeleton-bars span:nth-child(4) { height: 70%; }
+.sus-chart-skeleton-bars span:nth-child(5) { height: 50%; }
+.sus-chart-skeleton-bars span:nth-child(6) { height: 65%; }
+.sus-chart-skeleton-bars span:nth-child(7) { height: 45%; }
+
+.sus-chart-skeleton-line {
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    color-mix(in srgb, var(--accent-primary) 18%, var(--surface-2)) 50%,
+    var(--surface-2) 70%
+  );
+}
+
+.sus-chart-skeleton-ring {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: var(--radius-full);
+  background: conic-gradient(var(--accent-primary) 0deg 130deg, var(--surface-2) 130deg 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
+}
+
+/* --- Why this matters ------------------------------------------------------ */
+
+.sus-learn-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.sus-learn-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.sus-learn-text {
+  margin: 0 0 var(--space-4);
+  max-width: 68ch;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.sus-learn-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sus-learn-points li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.sus-learn-point-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

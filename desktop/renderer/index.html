@@ -258,7 +258,7 @@
                 <div class="ps-toolbar-meta">
                   <span id="ps-char-count" class="ps-toolbar-stat">0 characters</span>
                   <span class="ps-toolbar-divider" aria-hidden="true"></span>
-                  <span id="ps-token-estimate" class="ps-toolbar-stat">— tokens</span>
+                  <span id="ps-token-estimate" class="ps-toolbar-stat">0 tokens</span>
                 </div>
                 <button id="ps-btn-clear" class="link-btn" type="button">Clear</button>
               </div>
@@ -436,19 +436,27 @@
 
           <!-- Usage -->
           <section id="page-usage" class="page hidden">
-            <div class="page-header-row">
-              <h1 class="page-title">Usage</h1>
-              <button id="btn-refresh-usage" class="link-btn">Refresh</button>
-            </div>
-            <p class="muted page-subtitle">
-              Real token usage from your Claude Code and Codex logs on this machine.
-            </p>
-
-            <div id="usage-range" class="usage-range">
-              <button class="usage-range-btn" data-days="7">7d</button>
-              <button class="usage-range-btn is-active" data-days="30">30d</button>
-              <button class="usage-range-btn" data-days="90">90d</button>
-            </div>
+            <header class="usg-header">
+              <div>
+                <h1 class="page-title">Usage</h1>
+                <p class="muted page-subtitle">
+                  Real token usage from your Claude Code and Codex logs on this machine.
+                </p>
+              </div>
+              <div class="usg-header-actions">
+                <div id="usage-range" class="usg-range">
+                  <button class="usage-range-btn" data-days="7">7 Days</button>
+                  <button class="usage-range-btn is-active" data-days="30">30 Days</button>
+                  <button class="usage-range-btn" data-days="90">90 Days</button>
+                </div>
+                <button id="btn-refresh-usage" class="ov-btn-secondary usg-refresh-btn" type="button">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v6h-6" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+            </header>
 
             <div id="usage-empty" class="empty-state hidden">
               <div class="empty-state-icon-frame">
@@ -462,34 +470,71 @@
             </div>
 
             <div id="usage-content" class="hidden">
-              <div class="stat-grid" id="usage-tiles"></div>
+              <div class="usg-metrics" id="usage-tiles"></div>
 
-              <div class="section-block">
-                <div class="section-header">
-                  <h2>Tokens per day</h2>
-                  <span id="usage-daily-peak" class="usage-daily-peak"></span>
+              <section class="usg-card usg-chart-card" aria-labelledby="usg-chart-title">
+                <div class="usg-chart-header">
+                  <div>
+                    <h2 id="usg-chart-title">Tokens per day</h2>
+                    <p class="muted usage-daily-caption">Hover a bar for the exact date and value.</p>
+                  </div>
+                  <div class="usg-chart-legend">
+                    <span id="usage-daily-peak" class="usg-chip"></span>
+                    <span id="usage-daily-avg" class="usg-chip"></span>
+                    <span id="usage-daily-today" class="usg-chip usg-chip-accent"></span>
+                  </div>
                 </div>
-                <p class="muted usage-daily-caption">
-                  Taller bar = more tokens used that day. Hover a bar for the exact date and count.
-                </p>
-                <div id="usage-daily-chart" class="usage-bars"></div>
+                <div id="usg-chart-switcher" class="usg-chart-switcher">
+                  <button class="usg-chart-tab is-active" data-series="totalTokens" data-format="tok">Tokens</button>
+                  <button class="usg-chart-tab" data-series="costUSD" data-format="usd">Cost</button>
+                  <button class="usg-chart-tab" data-series="outputTokens" data-format="tok">Output Tokens</button>
+                  <button class="usg-chart-tab" data-series="cacheSavingsUSD" data-format="usd">Cache Savings</button>
+                </div>
+                <div id="usage-daily-chart" class="usage-bars usg-bars-lg"></div>
                 <div id="usage-daily-labels" class="usage-daily-labels"></div>
-              </div>
+              </section>
 
-              <div class="section-block">
-                <div class="section-header"><h2>Insights</h2></div>
+              <section class="usg-card" aria-labelledby="usg-insights-title">
+                <div class="section-header">
+                  <h2 id="usg-insights-title">AI Recommendations</h2>
+                </div>
                 <div id="usage-insights" class="usage-insights"></div>
-              </div>
+              </section>
 
-              <div class="section-block">
-                <div class="section-header"><h2>Cost by model</h2></div>
-                <div id="usage-models" class="usage-models"></div>
-              </div>
+              <section class="usg-card" aria-labelledby="usg-models-title">
+                <div class="section-header">
+                  <h2 id="usg-models-title">Usage breakdown</h2>
+                </div>
+                <div class="usg-breakdown">
+                  <div id="usage-models" class="usage-models"></div>
+                  <div class="usg-distribution">
+                    <div id="usg-donut" class="usg-donut" role="img" aria-label="Cost share by model"></div>
+                    <ul id="usg-donut-legend" class="usg-donut-legend"></ul>
+                  </div>
+                </div>
+              </section>
 
-              <div class="section-block">
-                <div class="section-header"><h2>Recent sessions</h2></div>
-                <ul id="usage-sessions" class="activity-list"></ul>
-              </div>
+              <section class="usg-card" aria-labelledby="usg-sessions-title">
+                <div class="section-header">
+                  <h2 id="usg-sessions-title">Recent sessions</h2>
+                </div>
+                <div class="usg-table-wrap">
+                  <table class="usg-table">
+                    <thead>
+                      <tr>
+                        <th>Project</th>
+                        <th>Date</th>
+                        <th>Requests</th>
+                        <th>Tokens</th>
+                        <th>Duration</th>
+                        <th>Cost</th>
+                        <th>Source</th>
+                      </tr>
+                    </thead>
+                    <tbody id="usage-sessions"></tbody>
+                  </table>
+                </div>
+              </section>
 
               <p id="usage-meta" class="muted usage-meta"></p>
             </div>
@@ -511,7 +556,7 @@
             <section class="itg-section">
               <div class="itg-section-header">
                 <h2>Supported AI tools</h2>
-                <p class="muted">Toggle the ones you use — selected tools shape how feedback is framed.</p>
+                <p class="muted">Toggle the ones you use. Selected tools shape how feedback is framed.</p>
               </div>
               <div id="tools-list" class="itg-tool-grid"></div>
             </section>
@@ -519,7 +564,7 @@
             <section class="itg-section">
               <div class="itg-section-header">
                 <h2>Recommended setups</h2>
-                <p class="muted">One-click presets for common workflows — applies real toggles above, no confirmation needed.</p>
+                <p class="muted">One-click presets for common workflows. They apply real toggles above, no confirmation needed.</p>
               </div>
               <div id="itg-preset-grid" class="itg-preset-grid"></div>
             </section>
@@ -527,7 +572,7 @@
             <section class="itg-section">
               <div class="itg-section-header">
                 <h2>Future integrations</h2>
-                <p class="muted">Not wired up yet — on the roadmap.</p>
+                <p class="muted">Not wired up yet. On the roadmap.</p>
               </div>
               <div id="itg-future-grid" class="itg-tool-grid itg-tool-grid-future"></div>
             </section>
@@ -535,127 +580,407 @@
 
           <!-- Sustainability -->
           <section id="page-sustainability" class="page hidden">
-            <h1 class="page-title">Sustainability</h1>
-            <p class="muted page-subtitle">
-              Real numbers from prompts you've checked on this device — fewer exploration tokens sent means less
-              compute burned per request.
-            </p>
+            <header class="sus-header">
+              <h1 class="page-title">Sustainability</h1>
+              <p class="muted page-subtitle">
+                Real numbers from prompts you've checked on this device. Sending fewer exploration tokens means less
+                compute burned per request.
+              </p>
+            </header>
 
-            <div class="stat-grid stat-grid-3">
-              <div class="stat-card">
-                <span class="stat-value" id="sustain-captures">0</span>
-                <span class="stat-label">Prompts optimized</span>
+            <div class="sus-metrics">
+              <div class="sus-metric">
+                <div class="sus-metric-top">
+                  <span class="sus-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+                    </svg>
+                  </span>
+                  <span class="sus-metric-label">Prompts optimized</span>
+                </div>
+                <span class="sus-metric-value" id="sustain-captures">0</span>
+                <span class="sus-metric-sub">Checked on this device</span>
               </div>
-              <div class="stat-card stat-card-accent">
-                <span class="stat-value" id="sustain-tokens-saved">0</span>
-                <span class="stat-label">Tokens saved</span>
+              <div class="sus-metric sus-metric-accent">
+                <div class="sus-metric-top">
+                  <span class="sus-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+                      <path d="m3 12 9 5 9-5" />
+                    </svg>
+                  </span>
+                  <span class="sus-metric-label">Tokens saved</span>
+                </div>
+                <span class="sus-metric-value" id="sustain-tokens-saved">0</span>
+                <span class="sus-metric-sub">Exploration cost avoided</span>
               </div>
-              <div class="stat-card">
-                <span class="stat-value" id="sustain-avg-pct">0%</span>
-                <span class="stat-label">Avg. reduction</span>
+              <div class="sus-metric">
+                <div class="sus-metric-top">
+                  <span class="sus-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m3 17 6-6 4 4 7-7" /><path d="M14 8h6v6" />
+                    </svg>
+                  </span>
+                  <span class="sus-metric-label">Average reduction</span>
+                </div>
+                <span class="sus-metric-value" id="sustain-avg-pct">0%</span>
+                <span class="sus-metric-sub">Per checked prompt</span>
+              </div>
+              <div class="sus-metric">
+                <div class="sus-metric-top">
+                  <span class="sus-metric-icon">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 20A7 7 0 0 1 4 13c0-4 3-9 10-11 1 6 1 10-1 13a6.97 6.97 0 0 1-2 5Z" />
+                      <path d="M9.5 14.5 18 6" />
+                    </svg>
+                  </span>
+                  <span class="sus-metric-label">Environmental impact</span>
+                </div>
+                <span class="sus-metric-value" id="sustain-co2-saved">0g</span>
+                <span class="sus-metric-sub">Est. CO&#8322; avoided, illustrative</span>
               </div>
             </div>
 
-            <div id="sustain-empty" class="empty-state hidden">
-              <div class="empty-state-icon-frame">
+            <div class="sus-summary-card">
+              <div class="sus-summary-icon" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22c-4-1-7-4.5-7-9 0-5 3-9 7-11 4 2 7 6 7 11 0 4.5-3 8-7 9Z" />
+                  <path d="M12 22V11" />
+                </svg>
+              </div>
+              <div class="sus-summary-body">
+                <h2 class="sus-summary-title">&#127793; Your AI Efficiency</h2>
+                <p class="sus-summary-text" id="sus-summary-text">
+                  Check your first prompt to start building your efficiency story.
+                </p>
+              </div>
+            </div>
+
+            <div id="sustain-empty" class="empty-state sus-empty hidden">
+              <div class="sus-empty-decoration" aria-hidden="true"></div>
+              <div class="empty-state-icon-frame sus-empty-icon-frame">
                 <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M11 20A7 7 0 0 1 4 13c0-4 3-9 10-11 1 6 1 10-1 13a6.97 6.97 0 0 1-2 5Z" />
                   <path d="M9.5 14.5 18 6" />
                 </svg>
               </div>
-              <p class="empty-state-title">No savings tracked yet</p>
-              <p class="muted">Check a prompt from Overview to start building your impact history.</p>
+              <p class="empty-state-title">No sustainability data yet</p>
+              <p class="muted sus-empty-text">
+                Run your first prompt analysis to begin tracking your efficiency improvements and environmental
+                impact.
+              </p>
+              <div class="sus-empty-actions">
+                <button id="sus-btn-analyze" class="ov-btn-primary" type="button">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+                  </svg>
+                  Analyze a Prompt
+                </button>
+                <a href="#sus-learn" id="sus-link-learn" class="link-btn">Learn about Sustainability</a>
+              </div>
             </div>
 
             <div id="sustain-history-block" class="section-block hidden">
+              <div class="sus-charts">
+                <div class="sus-chart-card">
+                  <div class="sus-chart-header">
+                    <span>Weekly Token Savings</span>
+                  </div>
+                  <div class="sus-chart-skeleton sus-chart-skeleton-bars" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                  <p class="sus-chart-note muted">Coming soon</p>
+                </div>
+                <div class="sus-chart-card">
+                  <div class="sus-chart-header">
+                    <span>Optimization Trend</span>
+                  </div>
+                  <div class="sus-chart-skeleton sus-chart-skeleton-line" aria-hidden="true"></div>
+                  <p class="sus-chart-note muted">Coming soon</p>
+                </div>
+                <div class="sus-chart-card">
+                  <div class="sus-chart-header">
+                    <span>Efficiency Score</span>
+                  </div>
+                  <div class="sus-chart-skeleton sus-chart-skeleton-ring" aria-hidden="true"></div>
+                  <p class="sus-chart-note muted">Coming soon</p>
+                </div>
+              </div>
+
               <div class="section-header">
                 <h2>Recent optimizations</h2>
               </div>
               <ul id="sustain-history-list" class="activity-list"></ul>
             </div>
+
+            <section id="sus-learn" class="sus-learn-card" aria-labelledby="sus-learn-title">
+              <h2 id="sus-learn-title" class="sus-learn-title">Why this matters</h2>
+              <p class="sus-learn-text">
+                Shorter, more focused prompts mean the AI explores fewer files and burns fewer tokens getting to an
+                answer. That reduces inference cost, lowers the compute each request needs, and gets you a faster,
+                more relevant response.
+              </p>
+              <ul class="sus-learn-points">
+                <li>
+                  <span class="sus-learn-point-icon" aria-hidden="true">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m12 2 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5" />
+                    </svg>
+                  </span>
+                  Fewer tokens sent means less compute burned per request
+                </li>
+                <li>
+                  <span class="sus-learn-point-icon" aria-hidden="true">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+                    </svg>
+                  </span>
+                  A tighter scope keeps the AI from wandering across your whole codebase
+                </li>
+                <li>
+                  <span class="sus-learn-point-icon" aria-hidden="true">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m3 17 6-6 4 4 7-7" /><path d="M14 8h6v6" />
+                    </svg>
+                  </span>
+                  Lower token cost, same or better results
+                </li>
+              </ul>
+            </section>
           </section>
 
           <!-- Settings -->
           <section id="page-settings" class="page hidden">
-            <h1 class="page-title">Settings</h1>
+            <header class="set-header">
+              <h1 class="page-title">Settings</h1>
+              <p class="muted page-subtitle">
+                Manage your account, application preferences, integrations, and accessibility.
+              </p>
+            </header>
 
-            <div class="settings-card">
-              <div class="identity">
-                <div class="avatar">
+            <!-- Account -->
+            <section class="set-card set-account-card" aria-labelledby="set-title-account">
+              <div class="set-section-title" id="set-title-account">
+                <span class="set-section-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" /><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
+                  </svg>
+                </span>
+                <h2>Account</h2>
+              </div>
+
+              <div class="set-identity">
+                <div class="set-avatar">
                   <span id="settings-avatar-initial">?</span>
                 </div>
-                <div class="identity-info">
-                  <div id="settings-name-display" class="identity-name-row">
-                    <span id="settings-identity-name" class="identity-name">—</span>
-                    <button id="btn-edit-name" class="icon-btn" aria-label="Edit display name" title="Edit display name">
-                      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+                <div class="set-identity-info">
+                  <div id="settings-name-display" class="set-name-row">
+                    <span id="settings-identity-name" class="set-identity-name"></span>
+                    <span class="set-badge-signed-in">
+                      <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
                       </svg>
-                    </button>
+                      Signed in
+                    </span>
                   </div>
                   <form id="settings-name-form" class="settings-name-form hidden">
-                    <input id="settings-name-input" class="settings-name-input" type="text" maxlength="100" autocomplete="off" />
-                    <button type="submit" class="pill-action">Save</button>
+                    <input id="settings-name-input" class="set-input" type="text" maxlength="100" autocomplete="off" aria-label="Display name" />
+                    <button type="submit" class="ov-btn-primary">Save</button>
                     <button type="button" id="btn-cancel-name" class="link-btn">Cancel</button>
                   </form>
-                  <div id="settings-identity-email" class="identity-email muted">—</div>
+                  <div id="settings-identity-email" class="set-identity-email muted"></div>
                 </div>
+                <button id="btn-edit-name" class="ov-btn-secondary set-edit-btn" type="button">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+                  </svg>
+                  Edit profile
+                </button>
               </div>
               <div id="settings-name-error" class="alert hidden"></div>
-            </div>
+            </section>
 
-            <div class="settings-list">
-              <div class="settings-row">
-                <span class="settings-row-label">Appearance</span>
-                <button id="btn-toggle-theme" class="theme-toggle-btn">
-                  <svg id="theme-toggle-icon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></svg>
-                  <span id="theme-toggle-label">Dark</span>
-                </button>
+            <!-- Appearance -->
+            <section class="set-card" aria-labelledby="set-title-appearance">
+              <div class="set-section-title" id="set-title-appearance">
+                <span class="set-section-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-.6-.3-1-.6-1.4-.3-.4-.6-.8-.6-1.3 0-.8.7-1.3 1.5-1.3H16a4 4 0 0 0 4-4c0-4.4-3.6-8-8-8Z" />
+                    <circle cx="7.5" cy="10.5" r=".9" fill="currentColor" stroke="none" />
+                    <circle cx="9.5" cy="7" r=".9" fill="currentColor" stroke="none" />
+                    <circle cx="14.5" cy="7" r=".9" fill="currentColor" stroke="none" />
+                    <circle cx="16.5" cy="10.5" r=".9" fill="currentColor" stroke="none" />
+                  </svg>
+                </span>
+                <h2>Appearance</h2>
               </div>
-              <div class="settings-row">
-                <span class="settings-row-label">Capture hotkey</span>
-                <span id="settings-hotkey-label" class="settings-row-value"></span>
-              </div>
-              <div class="settings-row">
-                <span class="settings-row-label">Version</span>
-                <span class="settings-row-value">0.1.0</span>
-              </div>
-            </div>
 
-            <div class="settings-list">
-              <div class="settings-row">
-                <span class="settings-row-label">Auto-capture (background)</span>
-                <button id="btn-autocapture" class="theme-toggle-btn" role="switch" aria-checked="false">
-                  <span id="autocapture-label">Off</span>
-                </button>
-              </div>
-              <div class="settings-row">
-                <span class="settings-row-label">Permission</span>
-                <span id="autocapture-permission" class="settings-row-value muted">—</span>
-              </div>
-              <div class="settings-row">
-                <span class="settings-row-label">GitHub repo</span>
-                <input id="capture-repo-input" class="settings-name-input" type="text" placeholder="github.com/owner/repo" autocomplete="off" />
-              </div>
-              <div class="settings-row">
-                <span id="capture-repo-status" class="muted">Files from this repo sharpen suggestions.</span>
-                <button id="btn-save-repo" class="theme-toggle-btn">Save</button>
-              </div>
-            </div>
-            <p class="muted settings-account-note">
-              Off by default. When on, copy your prompt (Ctrl+C) from a coding app — Cursor, VS
-              Code, or a terminal — and a small popup shows a focused rewrite to paste back. It
-              ignores copies from other apps, reads only your clipboard locally, and never records
-              your screen.
-            </p>
+              <div class="set-rows">
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Theme</span>
+                      <span class="set-row-desc">Switch the whole app between light and dark.</span>
+                    </div>
+                  </div>
+                  <button id="btn-toggle-theme" class="set-toggle-pill">
+                    <svg id="theme-toggle-icon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></svg>
+                    <span id="theme-toggle-label">Dark</span>
+                  </button>
+                </div>
 
-            <div class="section-block">
-              <div class="section-header">
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Capture hotkey</span>
+                      <span class="set-row-desc">Opens the quick-capture popup from any app.</span>
+                    </div>
+                  </div>
+                  <span id="settings-hotkey-label" class="set-row-value set-kbd"></span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Capture & Integrations -->
+            <section class="set-card" aria-labelledby="set-title-capture">
+              <div class="set-section-title" id="set-title-capture">
+                <span class="set-section-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+                  </svg>
+                </span>
+                <h2>Capture &amp; Integrations</h2>
+              </div>
+
+              <div class="set-rows">
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Auto-capture</span>
+                      <span class="set-row-desc">
+                        Watch your clipboard in coding apps and pop a focused rewrite automatically.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="set-switch-control">
+                    <span id="autocapture-label" class="set-switch-state muted">Off</span>
+                    <button id="btn-autocapture" class="set-switch" role="switch" aria-checked="false" aria-label="Auto-capture"></button>
+                  </div>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Accessibility permission</span>
+                      <span class="set-row-desc">Required by the OS so Metriq can read copied text.</span>
+                    </div>
+                  </div>
+                  <button type="button" id="autocapture-permission" class="set-permission-pill muted">Checking…</button>
+                </div>
+              </div>
+
+              <div class="set-repo-block">
+                <label class="set-row-title" for="capture-repo-input">GitHub repository</label>
+                <div class="set-repo-input-row">
+                  <input id="capture-repo-input" class="set-input" type="text" placeholder="github.com/owner/repo" autocomplete="off" />
+                  <button id="btn-save-repo" class="ov-btn-primary">Save</button>
+                </div>
+                <p id="capture-repo-status" class="muted set-repo-status">Files from this repository help improve suggestions.</p>
+              </div>
+
+              <p class="muted set-disclosure">
+                Off by default. When on, copy your prompt (Ctrl+C) from a coding app, like Cursor, VS
+                Code, or a terminal, and a small popup shows a focused rewrite to paste back. It
+                ignores copies from other apps, reads only your clipboard locally, and never
+                records your screen.
+              </p>
+            </section>
+
+            <!-- Accessibility -->
+            <section class="set-card" aria-labelledby="set-title-a11y">
+              <div class="set-section-title" id="set-title-a11y">
+                <span class="set-section-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 7v3M8 10h8M12 10v4l-2.5 4M12 14l2.5 4" />
+                  </svg>
+                </span>
                 <h2>Accessibility</h2>
               </div>
+              <p class="muted set-section-sub">
+                Each option defaults to your system setting until you choose explicitly.
+              </p>
               <div id="accessibility-list" class="a11y-list"></div>
-            </div>
+            </section>
+
+            <!-- About -->
+            <section class="set-card" aria-labelledby="set-title-about">
+              <div class="set-section-title" id="set-title-about">
+                <span class="set-section-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v5h1" />
+                  </svg>
+                </span>
+                <h2>About</h2>
+              </div>
+
+              <div class="set-rows">
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m12 2 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Version</span>
+                      <span class="set-row-desc">Current build of the desktop app.</span>
+                    </div>
+                  </div>
+                  <span class="set-row-value">0.1.0</span>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2C6.5 2 2 6.5 2 12c0 4.4 2.9 8.2 6.8 9.5.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.1-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.5-1.3.1-2.6 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .6 1.3.2 2.3.1 2.6.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 22 12c0-5.5-4.5-10-10-10Z" fill="currentColor" stroke="none" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Documentation</span>
+                      <span class="set-row-desc">Source, setup guide, and README on GitHub.</span>
+                    </div>
+                  </div>
+                  <button type="button" id="btn-settings-docs" class="link-btn set-external-btn">
+                    Open
+                    <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M7 17 17 7M8 7h9v9" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </section>
 
             <div class="settings-danger-zone">
               <button id="btn-logout" class="btn btn-danger-outline">Log out</button>

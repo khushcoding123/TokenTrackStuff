@@ -106,7 +106,7 @@
       label: "Perplexity",
       icon: "perplexity",
       logoFile: "perplexity.webp",
-      description: "AI-powered answer engine with cited, real-time web search.",
+      description: "AI answer engine with cited, live web search.",
     },
   ];
 
@@ -247,7 +247,7 @@
       suggestions.push({
         icon: "trendingUp",
         title: `Saving ~${ovSummary.avgSavedPct}% per prompt`,
-        desc: "Focused rewrites are trimming your exploration cost — keep it up.",
+        desc: "Focused rewrites are trimming your exploration cost. Keep it up.",
         positive: true,
       });
     }
@@ -255,7 +255,7 @@
       {
         icon: "lightbulb",
         title: "Name real files in prompts",
-        desc: "A concrete file reference bounds how far the AI explores — the single biggest token saver.",
+        desc: "A concrete file reference bounds how far the AI explores. It's the single biggest token saver.",
       },
       {
         icon: "shield",
@@ -497,7 +497,7 @@
       return;
     }
 
-    text.textContent = "No project linked — analysis won't be file-aware.";
+    text.textContent = "No project linked. Analysis won't be file-aware.";
     const action = document.createElement("button");
     action.type = "button";
     action.className = "ps-context-action";
@@ -511,7 +511,7 @@
     psCharCount.textContent = `${len.toLocaleString()} character${len === 1 ? "" : "s"}`;
     psTokenEstimate.textContent = psLatestResult
       ? `~${psLatestResult.promptTokens.toLocaleString()} tokens`
-      : "— tokens";
+      : "0 tokens";
   }
 
   function psRenderResult(result) {
@@ -1044,7 +1044,7 @@
       className: "high-contrast",
       icon: "contrast",
       label: "High contrast",
-      description: "A dedicated high-contrast palette — stronger separation between text, surfaces, borders, and controls. Defaults to your system setting until you choose explicitly.",
+      description: "A dedicated high-contrast palette with stronger separation between text, surfaces, borders, and controls. Defaults to your system setting until you choose explicitly.",
     },
     {
       id: "reduceMotion",
@@ -1359,7 +1359,7 @@
         : access === "not-required"
           ? "Not required on this OS"
           : access === "denied"
-            ? "Accessibility needed — click to grant"
+            ? "Accessibility needed. Click to grant"
             : access || "unknown";
   }
 
@@ -1390,8 +1390,8 @@
       await window.metriq.setCaptureRepoUrl(url);
       btnSaveRepo.textContent = "Saved";
       captureRepoStatus.textContent = url
-        ? "Suggestions will name files from this repo."
-        : "No repo — suggestions add scope guards only.";
+        ? "Suggestions will name files from this repository."
+        : "No repository connected. Suggestions add scope guards only.";
       setTimeout(() => (btnSaveRepo.textContent = "Save"), 1200);
     });
   }
@@ -1447,6 +1447,7 @@
   document.getElementById("btn-link-github-empty")?.addEventListener("click", () => btnLinkGithub.click());
 
   document.getElementById("btn-open-docs")?.addEventListener("click", () => window.metriq.openRepoDocs());
+  document.getElementById("btn-settings-docs")?.addEventListener("click", () => window.metriq.openRepoDocs());
 
   btnGithubCancel?.addEventListener("click", () => {
     githubLinkForm.classList.add("hidden");
@@ -1489,6 +1490,24 @@
     return `${days}d ago`;
   }
 
+  // Rough, clearly-labeled illustrative estimate (not a precise/audited
+  // measurement) derived from real tokens-saved data — ~0.4g CO2 per 1,000
+  // tokens, a conservative ballpark for LLM inference energy use. Shown with
+  // a "~" and an "illustrative" sub-label in the UI so it never reads as a
+  // scientifically precise figure.
+  function formatCO2Estimate(savedTokens) {
+    const grams = savedTokens * 0.0004;
+    if (grams < 0.1) return "<0.1g";
+    if (grams < 1000) return `~${grams < 10 ? grams.toFixed(1) : Math.round(grams)}g`;
+    return `~${(grams / 1000).toFixed(1)}kg`;
+  }
+
+  document.getElementById("sus-btn-analyze")?.addEventListener("click", () => window.metriq.openCapture());
+  document.getElementById("sus-link-learn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    document.getElementById("sus-learn")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   function renderActivityRow(entry) {
     const li = document.createElement("li");
     li.className = "activity-item";
@@ -1503,7 +1522,7 @@
 
     const right = document.createElement("div");
     right.className = "activity-savings";
-    right.textContent = entry.savedTokens > 0 ? `−${entry.savedTokens} tokens` : "—";
+    right.textContent = entry.savedTokens > 0 ? `−${entry.savedTokens} tokens` : "N/A";
 
     li.append(left, right);
     return li;
@@ -1535,7 +1554,7 @@
     if (entry.savedTokens > 0) {
       savings.textContent = `−${entry.savedTokens.toLocaleString()} tokens`;
     } else {
-      savings.textContent = "—";
+      savings.textContent = "N/A";
       savings.classList.add("is-flat");
     }
 
@@ -1554,6 +1573,13 @@
     document.getElementById("sustain-captures").textContent = summary.totalCaptures;
     document.getElementById("sustain-tokens-saved").textContent = summary.totalSavedTokens.toLocaleString();
     document.getElementById("sustain-avg-pct").textContent = `${summary.avgSavedPct}%`;
+    document.getElementById("sustain-co2-saved").textContent = formatCO2Estimate(summary.totalSavedTokens);
+    document.getElementById("sus-summary-text").textContent =
+      summary.totalCaptures > 0
+        ? `You've optimized ${summary.totalCaptures} prompt${summary.totalCaptures === 1 ? "" : "s"} on this ` +
+          `device, saving ${summary.totalSavedTokens.toLocaleString()} tokens. That's an average ` +
+          `${summary.avgSavedPct}% reduction in exploration cost per prompt.`
+        : "Check your first prompt to start building your efficiency story.";
 
     recentActivityList.innerHTML = "";
     const hasHistory = summary.recent.length > 0;
@@ -1584,14 +1610,38 @@
   const usageDailyChart = document.getElementById("usage-daily-chart");
   const usageDailyLabels = document.getElementById("usage-daily-labels");
   const usageDailyPeak = document.getElementById("usage-daily-peak");
+  const usageDailyAvg = document.getElementById("usage-daily-avg");
+  const usageDailyToday = document.getElementById("usage-daily-today");
   const usageInsights = document.getElementById("usage-insights");
   const usageModels = document.getElementById("usage-models");
   const usageSessions = document.getElementById("usage-sessions");
   const usageMeta = document.getElementById("usage-meta");
   const usageRangeButtons = document.querySelectorAll(".usage-range-btn");
+  const usgChartTabs = document.querySelectorAll(".usg-chart-tab");
+  const usgDonut = document.getElementById("usg-donut");
+  const usgDonutLegend = document.getElementById("usg-donut-legend");
   const btnRefreshUsage = document.getElementById("btn-refresh-usage");
 
   let usageDays = 30;
+  let usageChartSeries = "totalTokens";
+  let usageChartFormat = "tok";
+  let latestUsageData = null;
+
+  const USG_ICON_PATHS = {
+    token: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 12h6"/>',
+    dollar: '<path d="M12 2v20M17 6.5c0-1.9-2.2-3.5-5-3.5S7 4.6 7 6.5 9.2 10 12 10s5 1.6 5 3.5-2.2 3.5-5 3.5-5-1.6-5-3.5"/>',
+    zap: '<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/>',
+    upload: '<path d="M12 20V8M7 12l5-5 5 5"/><path d="M4 20h16"/>',
+    warning: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+    flame: '<path d="M12 22c4-1 7-4 7-8.5 0-3-1.5-5-3-7 0 2-1 3.5-2.5 3.5C14.5 7 14 4 11 2c.5 3-1 5-3 7.5-1 1.3-2 3-2 4.5C6 18 8 21 12 22Z"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+    robot: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v6h-6"/>',
+  };
+
+  const USG_SEVERITY_ICON = { high: "warning", medium: "flame", info: "check" };
 
   function fmtTok(n) {
     if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -1607,19 +1657,47 @@
     return "$" + (n || 0).toFixed(2);
   }
 
-  function renderUsageTile(label, value, sub) {
+  function fmtDuration(ms) {
+    if (!ms || ms < 60_000) return "<1m";
+    const mins = Math.round(ms / 60_000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem ? `${hrs}h ${rem}m` : `${hrs}h`;
+  }
+
+  function fmtSessionDate(iso) {
+    return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  // A lightweight, honest "trend" — no separate prior-period fetch exists,
+  // so this compares the second half of the already-fetched range against
+  // the first half (same data, no new IPC call) rather than inventing a
+  // number. A first-half-vs-second-half "trend %" was tried and dropped —
+  // this kind of usage is inherently bursty (a few heavy coding days, near-
+  // zero otherwise), so any two-window average comparison keeps producing
+  // meaningless swings (e.g. "+3650%") no matter how the threshold is
+  // tuned. Rather than paper over that with more heuristics, the card just
+  // shows the real total and its real supporting stat.
+  function renderUsageTile(icon, label, value, sub) {
     const card = document.createElement("div");
-    card.className = "stat-card";
-    const v = document.createElement("span");
-    v.className = "stat-value";
-    v.textContent = value;
+    card.className = "usg-metric";
+    const top = document.createElement("div");
+    top.className = "usg-metric-top";
+    const iconWrap = document.createElement("span");
+    iconWrap.className = "usg-metric-icon";
+    iconWrap.innerHTML = svgIcon(USG_ICON_PATHS[icon] || "");
     const l = document.createElement("span");
-    l.className = "stat-label";
+    l.className = "usg-metric-label";
     l.textContent = label;
-    card.append(v, l);
+    top.append(iconWrap, l);
+    const v = document.createElement("span");
+    v.className = "usg-metric-value";
+    v.textContent = value;
+    card.append(top, v);
     if (sub) {
       const s = document.createElement("span");
-      s.className = "activity-time muted";
+      s.className = "usg-metric-sub";
       s.textContent = sub;
       card.append(s);
     }
@@ -1629,87 +1707,173 @@
   function renderUsageInsight(insight) {
     const div = document.createElement("div");
     div.className = `usage-insight ${insight.severity}`;
+    const head = document.createElement("div");
+    head.className = "usage-insight-head";
+    const iconWrap = document.createElement("span");
+    iconWrap.className = "usage-insight-icon";
+    iconWrap.innerHTML = svgIcon(USG_ICON_PATHS[USG_SEVERITY_ICON[insight.severity]] || USG_ICON_PATHS.flame, "icon-sm");
     const h = document.createElement("h3");
     h.textContent = insight.title;
+    head.append(iconWrap, h);
     const evidence = document.createElement("p");
     evidence.textContent = insight.evidence;
     const action = document.createElement("p");
     action.className = "usage-insight-action";
     action.textContent = `→ ${insight.action}`;
-    div.append(h, evidence, action);
+    div.append(head, evidence, action);
     return div;
   }
 
-  function renderUsageModelRow(model, maxCost) {
+  // Reuses the same bundled logo assets as the Tools/Integration Hub page
+  // (assets/logos/) — real files, not fabricated model art. Falls back to
+  // the generic robot outline for any other source.
+  const USG_MODEL_LOGO = { "claude-code": "claude.png", codex: "chatgpt.webp" };
+
+  function renderModelIcon(container, source) {
+    const logoFile = USG_MODEL_LOGO[source];
+    if (!logoFile) {
+      container.innerHTML = svgIcon(USG_ICON_PATHS.robot, "icon-sm");
+      return;
+    }
+    const img = document.createElement("img");
+    img.className = "usg-model-logo";
+    img.src = `assets/logos/${logoFile}`;
+    img.alt = "";
+    img.addEventListener("error", () => { container.innerHTML = svgIcon(USG_ICON_PATHS.robot, "icon-sm"); }, { once: true });
+    container.append(img);
+  }
+
+  function renderUsageModelRow(model, totalCost) {
     const row = document.createElement("div");
     row.className = "usage-model-row";
+
     const label = document.createElement("div");
     label.className = "usage-model-label";
+    const iconWrap = document.createElement("span");
+    iconWrap.className = "usg-model-icon";
+    renderModelIcon(iconWrap, model.source);
     const name = document.createElement("span");
+    name.className = "usg-model-name";
     name.textContent = model.label;
+    const pct = document.createElement("span");
+    pct.className = "usg-model-pct muted";
+    pct.textContent = totalCost > 0 ? `${Math.round((model.costUSD / totalCost) * 100)}%` : "N/A";
     const cost = document.createElement("span");
     cost.className = "cost";
     cost.textContent = usd(model.costUSD);
-    label.append(name, cost);
+    label.append(iconWrap, name, pct, cost);
+
+    const meta = document.createElement("div");
+    meta.className = "usg-model-meta muted";
+    meta.textContent = `${model.requests} requests · ${fmtTok(model.totalTokens)} tokens`;
+
     const track = document.createElement("div");
     track.className = "usage-model-bar-track";
     const fill = document.createElement("div");
     fill.className = "usage-model-bar-fill";
-    fill.style.width = `${maxCost > 0 ? (model.costUSD / maxCost) * 100 : 0}%`;
+    fill.style.width = "0%";
     track.append(fill);
-    row.append(label, track);
+    requestAnimationFrame(() => {
+      fill.style.width = `${totalCost > 0 ? (model.costUSD / totalCost) * 100 : 0}%`;
+    });
+
+    row.append(label, meta, track);
     return row;
   }
 
-  function renderUsageSessionRow(session) {
-    const li = document.createElement("li");
-    li.className = "activity-item";
-    const left = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "activity-title";
-    title.textContent = session.project;
-    const time = document.createElement("div");
-    time.className = "activity-time muted";
-    time.textContent = `${session.requests} reqs · ${fmtTok(session.totalTokens)} tok`;
-    left.append(title, time);
-    const right = document.createElement("div");
-    right.className = "activity-savings";
-    right.textContent = usd(session.costUSD);
-    li.append(left, right);
-    return li;
+  const USG_DONUT_COLORS = [
+    "var(--accent-primary)",
+    "var(--accent-secondary)",
+    "color-mix(in srgb, var(--accent-primary) 55%, var(--surface-2))",
+    "color-mix(in srgb, var(--accent-secondary) 55%, var(--surface-2))",
+    "var(--surface-2)",
+  ];
+
+  function renderUsageDonut(models, totalCost) {
+    usgDonutLegend.innerHTML = "";
+    if (!totalCost || !models.length) {
+      usgDonut.style.background = "var(--surface-2)";
+      return;
+    }
+    let cursor = 0;
+    const stops = [];
+    models.forEach((model, i) => {
+      const color = USG_DONUT_COLORS[Math.min(i, USG_DONUT_COLORS.length - 1)];
+      const share = (model.costUSD / totalCost) * 100;
+      const start = cursor;
+      const end = cursor + share;
+      stops.push(`${color} ${start}% ${end}%`);
+      cursor = end;
+
+      const li = document.createElement("li");
+      const swatch = document.createElement("span");
+      swatch.className = "usg-donut-swatch";
+      swatch.style.background = color;
+      const text = document.createElement("span");
+      text.textContent = `${model.label} · ${Math.round(share)}%`;
+      li.append(swatch, text);
+      usgDonutLegend.append(li);
+    });
+    usgDonut.style.background = `conic-gradient(${stops.join(", ")})`;
   }
 
-  async function refreshUsage() {
-    const data = await window.metriq.getUsage(usageDays);
-    const available = Boolean(data && data.available);
-    usageEmpty.classList.toggle("hidden", available);
-    usageContent.classList.toggle("hidden", !available);
-    if (!available) return;
+  function renderUsageSessionRow(session) {
+    const tr = document.createElement("tr");
 
-    const t = data.totals;
-    const reqs = (data.models || []).reduce((sum, m) => sum + m.requests, 0);
-    usageTiles.innerHTML = "";
-    usageTiles.append(
-      renderUsageTile("Total tokens", fmtTok(t.totalTokens), `${reqs} requests`),
-      renderUsageTile("Total cost", usd(t.costUSD), "API-equivalent"),
-      renderUsageTile("Saved by caching", usd(t.cacheSavingsUSD), `${fmtTok(t.cacheReadTokens)} cached`),
-      renderUsageTile("Output tokens", fmtTok(t.outputTokens), `${fmtTok(t.inputTokens)} input`)
-    );
+    const projectCell = document.createElement("td");
+    projectCell.className = "usg-cell-project";
+    const iconWrap = document.createElement("span");
+    iconWrap.className = "usg-row-icon";
+    iconWrap.innerHTML = svgIcon(USG_ICON_PATHS.folder, "icon-sm");
+    const name = document.createElement("span");
+    name.textContent = session.project || "No project";
+    projectCell.append(iconWrap, name);
 
-    const daily = data.daily || [];
-    const dmax = Math.max(...daily.map((d) => d.totalTokens), 1);
+    const dateCell = document.createElement("td");
+    dateCell.textContent = fmtSessionDate(session.startedAt);
+
+    const reqCell = document.createElement("td");
+    reqCell.className = "usg-cell-num";
+    reqCell.textContent = session.requests;
+
+    const tokCell = document.createElement("td");
+    tokCell.className = "usg-cell-num";
+    tokCell.textContent = fmtTok(session.totalTokens);
+
+    const durCell = document.createElement("td");
+    durCell.className = "usg-cell-num";
+    durCell.textContent = fmtDuration(session.durationMs);
+
+    const costCell = document.createElement("td");
+    costCell.className = "usg-cell-num usg-cell-cost";
+    costCell.textContent = usd(session.costUSD);
+
+    const sourceCell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = `usg-source-badge usg-source-${session.source}`;
+    badge.textContent = session.source === "codex" ? "Codex" : "Claude Code";
+    sourceCell.append(badge);
+
+    tr.append(projectCell, dateCell, reqCell, tokCell, durCell, costCell, sourceCell);
+    return tr;
+  }
+
+  function renderUsageChart() {
+    const daily = (latestUsageData && latestUsageData.daily) || [];
+    const format = usageChartFormat === "usd" ? usd : fmtTok;
+    const dmax = Math.max(...daily.map((d) => d[usageChartSeries] || 0), 1);
+
     usageDailyChart.innerHTML = "";
-    for (const d of daily) {
+    daily.forEach((d, i) => {
       const bar = document.createElement("div");
       bar.className = "usage-bar";
-      bar.style.height = `${Math.max((d.totalTokens / dmax) * 100, 1)}%`;
-      bar.title = `${fmtShortDate(d.date)} · ${fmtTok(d.totalTokens)} tokens`;
+      if (i === daily.length - 1) bar.classList.add("is-today");
+      const val = d[usageChartSeries] || 0;
+      bar.style.height = `${Math.max((val / dmax) * 100, 1)}%`;
+      bar.title = `${fmtShortDate(d.date)} · ${format(val)}`;
       usageDailyChart.append(bar);
-    }
+    });
 
-    // A handful of date ticks under the bars (first/middle/last) so the
-    // range has a reference point without crowding — exact value + date
-    // for any single day is still available via the bar's hover tooltip.
     usageDailyLabels.innerHTML = "";
     if (daily.length) {
       const tickIdxs = [...new Set([0, Math.floor((daily.length - 1) / 2), daily.length - 1])];
@@ -1720,25 +1884,67 @@
       }
     }
 
-    const peakDay = daily.reduce((max, d) => (!max || d.totalTokens > max.totalTokens ? d : max), null);
+    const peakDay = daily.reduce(
+      (max, d) => (!max || (d[usageChartSeries] || 0) > (max[usageChartSeries] || 0) ? d : max),
+      null
+    );
     usageDailyPeak.textContent =
-      peakDay && peakDay.totalTokens > 0 ? `Peak: ${fmtTok(peakDay.totalTokens)} on ${fmtShortDate(peakDay.date)}` : "";
+      peakDay && peakDay[usageChartSeries] > 0 ? `Peak ${format(peakDay[usageChartSeries])} · ${fmtShortDate(peakDay.date)}` : "";
+
+    const total = daily.reduce((s, d) => s + (d[usageChartSeries] || 0), 0);
+    usageDailyAvg.textContent = daily.length ? `Avg ${format(total / daily.length)}/day` : "";
+
+    const today = daily[daily.length - 1];
+    usageDailyToday.textContent = today ? `Today ${format(today[usageChartSeries] || 0)}` : "";
+  }
+
+  for (const tab of usgChartTabs) {
+    tab.addEventListener("click", () => {
+      usageChartSeries = tab.dataset.series;
+      usageChartFormat = tab.dataset.format;
+      for (const t of usgChartTabs) t.classList.toggle("is-active", t === tab);
+      renderUsageChart();
+    });
+  }
+
+  async function refreshUsage() {
+    const data = await window.metriq.getUsage(usageDays);
+    const available = Boolean(data && data.available);
+    usageEmpty.classList.toggle("hidden", available);
+    usageContent.classList.toggle("hidden", !available);
+    if (!available) return;
+
+    latestUsageData = data;
+    const t = data.totals;
+    const reqs = (data.models || []).reduce((sum, m) => sum + m.requests, 0);
+    const contextTokens = t.inputTokens + t.cacheCreationTokens + t.cacheReadTokens;
+    const cacheHitRate = contextTokens > 0 ? t.cacheReadTokens / contextTokens : 0;
+
+    usageTiles.innerHTML = "";
+    usageTiles.append(
+      renderUsageTile("token", "Total tokens", fmtTok(t.totalTokens), `${reqs} requests`),
+      renderUsageTile("dollar", "Estimated cost", usd(t.costUSD), "API-equivalent"),
+      renderUsageTile("zap", "Cache savings", usd(t.cacheSavingsUSD), `${Math.round(cacheHitRate * 100)}% cache hit`),
+      renderUsageTile("upload", "Output tokens", fmtTok(t.outputTokens), `${fmtTok(t.inputTokens)} input`)
+    );
+
+    renderUsageChart();
 
     const insights = data.insights || [];
     usageInsights.innerHTML = "";
     if (!insights.length) {
       const p = document.createElement("p");
       p.className = "muted empty-note";
-      p.textContent = "No issues flagged — usage looks healthy.";
+      p.textContent = "No issues flagged. Usage looks healthy.";
       usageInsights.append(p);
     } else {
       for (const insight of insights) usageInsights.append(renderUsageInsight(insight));
     }
 
     const models = data.models || [];
-    const maxCost = Math.max(...models.map((m) => m.costUSD), 0);
     usageModels.innerHTML = "";
-    for (const model of models) usageModels.append(renderUsageModelRow(model, maxCost));
+    for (const model of models) usageModels.append(renderUsageModelRow(model, t.costUSD));
+    renderUsageDonut(models, t.costUSD);
 
     usageSessions.innerHTML = "";
     for (const session of (data.sessions || []).slice(0, 10)) {

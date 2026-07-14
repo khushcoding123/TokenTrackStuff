@@ -15,7 +15,7 @@ function credentialsPath() {
 function saveSession(session) {
   if (!safeStorage.isEncryptionAvailable()) {
     throw new Error(
-      "OS-level secure storage isn't available on this machine — refusing to store the session in plaintext."
+      "OS-level secure storage isn't available on this machine, so the session can't be stored safely."
     );
   }
   const path = credentialsPath();
