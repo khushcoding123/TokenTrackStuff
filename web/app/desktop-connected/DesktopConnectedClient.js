@@ -56,7 +56,7 @@ export default function DesktopConnectedClient() {
       </div>
       <h2 className="font-headline-lg text-headline-lg text-on-background">You've successfully logged in</h2>
       <p className="font-body-sm text-body-sm text-on-surface-variant">
-        Taking you back to the Metriq desktop app now. You can close this tab once it opens — if nothing happens
+        Taking you back to the Metriq desktop app now. You can close this tab once it opens. If nothing happens
         after a few seconds, click below to finish connecting.
       </p>
       {callbackUrl && (

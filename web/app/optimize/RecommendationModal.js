@@ -102,7 +102,7 @@ export default function RecommendationModal({ data, onClose, onUse }) {
             </h3>
             {relevantFiles.length === 0 ? (
               <p className="font-body-sm text-body-sm text-on-surface-variant">
-                No specific files matched. The improved prompt still adds a starting point and scope guard — connect a repo or name the feature for file-level targeting.
+                No specific files matched. The improved prompt still adds a starting point and scope guard. Connect a repo or name the feature for file-level targeting.
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
@@ -164,7 +164,7 @@ export default function RecommendationModal({ data, onClose, onUse }) {
           <button
             className="font-label-md text-label-md text-on-primary bg-primary hover:bg-primary/90 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
             onClick={() => {
-              copy(improvedPrompt, "Improved prompt copied — paste it into your AI tool");
+              copy(improvedPrompt, "Improved prompt copied. Paste it into your AI tool");
               onUse?.(improvedPrompt);
             }}
             type="button"

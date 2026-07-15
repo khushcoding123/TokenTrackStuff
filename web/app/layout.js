@@ -5,10 +5,10 @@ import ThemeProvider from "./components/ThemeProvider";
 export const metadata = {
   title: {
     default: "Metriq",
-    template: "%s — Metriq",
+    template: "%s | Metriq",
   },
   description:
-    "Metriq is an AI coding companion that analyzes your prompts against your real codebase before they reach Claude, ChatGPT, Cursor, or VS Code — flagging broad prompts, estimating token cost, and rewriting vague prompts into focused ones.",
+    "Metriq is an AI coding companion that analyzes your prompts against your real codebase before they reach Claude, ChatGPT, Cursor, or VS Code. It flags broad prompts, estimates token cost, and rewrites vague prompts into focused ones.",
   keywords: [
     "AI coding",
     "token usage",
@@ -19,7 +19,7 @@ export const metadata = {
     "desktop app",
   ],
   openGraph: {
-    title: "Metriq — Focus your prompts, save your tokens",
+    title: "Metriq focuses your prompts and saves your tokens",
     description:
       "Analyze coding prompts against your real codebase before they reach your AI tool. Flag broad prompts, estimate token cost, and rewrite them into focused ones.",
     type: "website",

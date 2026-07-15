@@ -15,7 +15,7 @@ const STEPS = [
   {
     icon: "edit_note",
     title: "Draft your prompt",
-    body: "Write what you're about to send to Claude, ChatGPT, Cursor, or VS Code — right inside Metriq first.",
+    body: "Write what you're about to send to Claude, ChatGPT, Cursor, or VS Code, right inside Metriq first.",
   },
   {
     icon: "bolt",

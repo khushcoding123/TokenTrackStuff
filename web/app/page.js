@@ -2,6 +2,7 @@ import Hero from "./components/landing/Hero";
 import ProductPreview from "./components/landing/ProductPreview";
 import BeforeAfter from "./components/landing/BeforeAfter";
 import HowItWorks from "./components/landing/HowItWorks";
+import BrowserExtension from "./components/landing/BrowserExtension";
 import Metrics from "./components/landing/Metrics";
 import Testimonials from "./components/landing/Testimonials";
 import { redirect } from "next/navigation";
@@ -20,7 +21,7 @@ const RELEASES_URL = "https://github.com/khushcoding123/TokenTrackStuff/releases
 const WIN_DOWNLOAD =
   "https://github.com/khushcoding123/TokenTrackStuff/releases/latest/download/Metriq-Windows.zip";
 
-export const metadata = { title: "Metriq — Focus your prompts before you send them" };
+export const metadata = { title: "Metriq focuses your prompts before you send them" };
 
 export default async function LandingPage({ searchParams }) {
   const params = await searchParams;
@@ -67,6 +68,7 @@ export default async function LandingPage({ searchParams }) {
         <ProductPreview />
         <BeforeAfter />
         <HowItWorks />
+        <BrowserExtension />
         <Metrics />
         <Testimonials />
       </main>

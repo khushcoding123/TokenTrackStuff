@@ -165,7 +165,7 @@ export default function ProductPreview() {
             <span className="w-2.5 h-2.5 rounded-full bg-[#F0A93A]/80" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#34D399]/80" />
             <span className="flex-1 text-center font-label-sm text-[11px] text-[#9CA3AE] tracking-wide">
-              Metriq — Prompt Studio
+              Metriq Prompt Studio
             </span>
             <span className="font-label-sm text-[10px] text-[#6B7280] border border-white/10 rounded px-1.5 py-0.5">
               ⌘⇧M

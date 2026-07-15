@@ -129,7 +129,7 @@ export default function OptimizeClient() {
       <div>
         <h2 className="font-headline-lg text-headline-lg text-on-surface">Optimize a prompt</h2>
         <p className="font-body-md text-body-md text-on-surface-variant mt-1 max-w-2xl">
-          Connect your repo once, paste the prompt you&apos;re about to send your AI coding tool, and Metriq rewrites it to point at the right files — so the AI stops searching the whole project.
+          Connect your repo once, paste the prompt you&apos;re about to send your AI coding tool, and Metriq rewrites it to point at the right files. That way the AI stops searching the whole project.
         </p>
       </div>
 
@@ -198,7 +198,7 @@ export default function OptimizeClient() {
         />
         <div className="flex items-center justify-between gap-3 mt-3">
           <span className="font-label-sm text-label-sm text-on-surface-variant">
-            {connected ? `Scoped to ${connected.owner}/${connected.repo}` : "No repo connected — connect one for file-level targeting"}
+            {connected ? `Scoped to ${connected.owner}/${connected.repo}` : "No repo connected. Connect one for file-level targeting"}
           </span>
           <button
             className="font-label-md text-label-md text-on-primary bg-primary hover:bg-primary/90 px-5 py-2.5 rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2"

@@ -23,7 +23,7 @@ const EXAMPLES = [
   },
   {
     quote:
-      "The breadth score catches it before I hit send — broad, vague prompts get flagged with the exact file to point the AI at instead.",
+      "The breadth score catches it before I hit send. Broad, vague prompts get flagged with the exact file to point the AI at instead.",
     context: "Refactoring a Node/Express API",
   },
   {
@@ -38,7 +38,7 @@ const EXAMPLES = [
   },
   {
     quote:
-      "Seeing the projected token cost before sending changed how I write prompts — shorter, more specific, less exploration.",
+      "Seeing the projected token cost before sending changed how I write prompts. Shorter, more specific, less exploration.",
     context: "Building a Next.js dashboard",
   },
   {
@@ -107,7 +107,7 @@ export default function Testimonials() {
             What token savings looks like
           </h2>
           <p className="font-body-sm text-body-sm text-on-surface-variant/70 text-center mb-stack-xl max-w-xl mx-auto">
-            Metriq is pre-launch — these are illustrative scenarios based on the analysis engine's real
+            Metriq is pre-launch. These are illustrative scenarios based on the analysis engine's real
             behavior, not quotes from real users.
           </p>
         </Reveal>

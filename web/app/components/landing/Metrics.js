@@ -103,7 +103,7 @@ export default function Metrics() {
       </div>
       <Reveal delay={0.2}>
         <p className="mt-6 text-center font-body-sm text-body-sm text-on-surface-variant/70">
-          Representative capability figures from Metriq's offline analysis engine — not usage statistics.
+          Representative capability figures from Metriq's offline analysis engine. Not usage statistics.
         </p>
       </Reveal>
     </section>
