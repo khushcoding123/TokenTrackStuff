@@ -17,6 +17,7 @@
 
 const svc = require("./typesense-service");
 const { keywordsFromPrompt } = require("../../packages/core/scanner.js");
+const { expandQuery } = require("./hybrid-query");
 
 const COLLECTION = svc.SCHEMAS.code_chunks.name;
 const DEFAULT_LIMIT = 4;
@@ -130,27 +131,64 @@ async function findRelevantFiles({ config = svc.getConfig(), userId, projectId, 
   if (!health.ok) return null;
 
   const keywords = keywordsFromPrompt(prompt);
-  const q = keywords.length ? keywords.join(" ") : String(prompt || "").trim();
-  if (!q) return null;
+  const baseQ = keywords.length ? keywords.join(" ") : String(prompt || "").trim();
+  if (!baseQ) return null;
+
+  // Phase 7: optional conceptual expansion when hybridSearch is enabled.
+  // Uses keyword tokens + synonyms (not the full sentence) for ranking.
+  const expanded = expandQuery(String(prompt || ""), {
+    hybridSearch: config.hybridSearch,
+    keywords,
+  });
+  const q = config.hybridSearch && expanded.expanded.length ? expanded.q : baseQ;
 
   try {
-    const response = await svc.search(config, COLLECTION, {
+    // Dedupe by file_path in hitsToContext rather than group_by — older
+    // collections may not have file_path as a facet (Typesense 400s otherwise).
+    // Prefer path/name/symbol hits; when hybrid, search those first so synonym
+    // matches on directories (e.g. src/core/usage/) beat incidental content hits
+    // in files that merely list the synonym strings.
+    const filters = { project_id: projectId, ...(userId ? { user_id: userId } : {}) };
+    const common = {
       q,
-      query_by: "symbols,file_name,file_path,content",
-      // symbols + paths weighted well above raw content
-      query_by_weights: "6,5,5,1",
-      filters: { project_id: projectId, ...(userId ? { user_id: userId } : {}) },
-      group_by: "file_path",
-      group_limit: 1,
-      per_page: Math.max(limit * 4, 20),
+      filters,
+      per_page: Math.max(limit * 6, 24),
       highlight_full_fields: "content,file_path,symbols",
       highlight_affix_num_tokens: 8,
+    };
+    let response = await svc.search(config, COLLECTION, {
+      ...common,
+      query_by: "symbols,file_name,file_path,directory",
+      query_by_weights: "6,5,5,4",
     });
-    const found = (response.grouped_hits || response.hits || []).length;
+    let found = (response.hits || []).length;
+    if (found < limit) {
+      const contentRes = await svc.search(config, COLLECTION, {
+        ...common,
+        query_by: "symbols,file_name,file_path,content",
+        query_by_weights: "6,5,5,1",
+      });
+      const seen = new Set((response.hits || []).map((h) => h.document?.file_path));
+      const merged = [...(response.hits || [])];
+      for (const h of contentRes.hits || []) {
+        const fp = h.document?.file_path;
+        if (!fp || seen.has(fp)) continue;
+        seen.add(fp);
+        merged.push(h);
+      }
+      response = { ...contentRes, hits: merged };
+      found = merged.length;
+    }
     if (!found) return null;
     const { projectContext, matches } = hitsToContext(response, limit);
     if (!projectContext.files.length) return null;
-    return { projectContext, matches, source: "typesense" };
+    return {
+      projectContext,
+      matches,
+      source: "typesense",
+      hybrid: Boolean(expanded.hybrid && expanded.expanded.length),
+      expandedTerms: expanded.expanded,
+    };
   } catch {
     return null; // any failure -> scanner fallback
   }

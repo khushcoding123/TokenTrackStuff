@@ -36,11 +36,12 @@ const CODE_CHUNKS_SCHEMA = {
   fields: [
     { name: "user_id", type: "string", facet: true },
     { name: "project_id", type: "string", facet: true },
-    { name: "file_path", type: "string" },
-    { name: "file_name", type: "string" },
+    // file_path is faceted so group_by=file_path works in Typesense searches.
+    { name: "file_path", type: "string", facet: true },
+    { name: "file_name", type: "string", facet: true },
     { name: "extension", type: "string", facet: true },
     { name: "directory", type: "string", facet: true },
-    { name: "symbols", type: "string[]", optional: true },
+    { name: "symbols", type: "string[]", facet: true, optional: true },
     { name: "content", type: "string" },
     { name: "chunk_number", type: "int32" },
     { name: "content_hash", type: "string" },
@@ -70,9 +71,37 @@ const PROMPT_RUNS_SCHEMA = {
   default_sorting_field: "timestamp",
 };
 
+// Normalized Claude Code / Codex / Cursor usage sessions (Phase 5). Discovery
+// only — the deterministic aggregate() pipeline remains the source of truth.
+const USAGE_SESSIONS_SCHEMA = {
+  name: "metriq_usage_sessions",
+  fields: [
+    { name: "user_id", type: "string", facet: true },
+    { name: "project_id", type: "string", facet: true, optional: true },
+    { name: "session_id", type: "string" },
+    { name: "project", type: "string", facet: true, optional: true },
+    { name: "tool", type: "string", facet: true },
+    { name: "models", type: "string[]", facet: true, optional: true },
+    { name: "search_text", type: "string" },
+    { name: "labels", type: "string[]", facet: true, optional: true },
+    { name: "input_tokens", type: "int64" },
+    { name: "output_tokens", type: "int64" },
+    { name: "cache_read_tokens", type: "int64" },
+    { name: "total_tokens", type: "int64" },
+    { name: "cost_usd", type: "float" },
+    { name: "cache_hit_rate", type: "float" },
+    { name: "requests", type: "int32" },
+    { name: "started_at", type: "int64" },
+    { name: "ended_at", type: "int64" },
+    { name: "indexed_at", type: "int64" },
+  ],
+  default_sorting_field: "started_at",
+};
+
 const SCHEMAS = {
   code_chunks: CODE_CHUNKS_SCHEMA,
   prompt_runs: PROMPT_RUNS_SCHEMA,
+  usage_sessions: USAGE_SESSIONS_SCHEMA,
 };
 
 const DEFAULTS = {
@@ -85,6 +114,10 @@ const DEFAULTS = {
 
 const HEALTH_TIMEOUT_MS = 1500;
 const OP_TIMEOUT_MS = 20000;
+// Cache health results briefly so a down server doesn't add ~1.5s to every
+// debounced Prompt Studio keystroke. Cleared implicitly when baseUrl/key change.
+let healthCache = { key: "", at: 0, result: null };
+const HEALTH_CACHE_MS = 4000;
 
 // ---------------------------------------------------------------------------
 // Pure config / query helpers (unit-tested)
@@ -108,6 +141,12 @@ function resolveConfig(env = {}, prefs = {}) {
   const host = pick("TYPESENSE_HOST", "host", DEFAULTS.host);
   const port = pick("TYPESENSE_PORT", "port", DEFAULTS.port);
   const apiKey = pick("TYPESENSE_API_KEY", "apiKey", DEFAULTS.apiKey);
+  const hybridRaw = pick("TYPESENSE_HYBRID", "hybridSearch", "");
+  const hybridSearch =
+    hybridRaw === "1" ||
+    hybridRaw === "true" ||
+    prefs.hybridSearch === true;
+
   return {
     mode: ["off", "local", "cloud"].includes(mode) ? mode : DEFAULTS.mode,
     protocol,
@@ -119,7 +158,31 @@ function resolveConfig(env = {}, prefs = {}) {
     // Cloud mode indexes source-code `content` only after explicit consent;
     // this flag is surfaced so callers can enforce metadata-only indexing.
     indexesCode: mode === "local" || (mode === "cloud" && prefs.cloudCodeConsent === true),
+    // Phase 7: conceptual keyword expansion (not vector embeddings yet).
+    hybridSearch,
   };
+}
+
+// Append numeric/date range clauses Typesense understands, e.g.
+// { input_tokens: { gte: 50000 } } → "input_tokens:>=50000".
+function buildRangeFilter(ranges = {}) {
+  const clauses = [];
+  for (const [field, spec] of Object.entries(ranges)) {
+    if (!spec || typeof spec !== "object") continue;
+    if (spec.gte !== undefined && spec.gte !== null && spec.gte !== "") {
+      clauses.push(`${field}:>=${Number(spec.gte)}`);
+    }
+    if (spec.lte !== undefined && spec.lte !== null && spec.lte !== "") {
+      clauses.push(`${field}:<=${Number(spec.lte)}`);
+    }
+    if (spec.gt !== undefined && spec.gt !== null && spec.gt !== "") {
+      clauses.push(`${field}:>${Number(spec.gt)}`);
+    }
+    if (spec.lt !== undefined && spec.lt !== null && spec.lt !== "") {
+      clauses.push(`${field}:<${Number(spec.lt)}`);
+    }
+  }
+  return clauses.join(" && ");
 }
 
 // Turn a { field: value } object into a Typesense `filter_by` clause. Skips
@@ -141,16 +204,17 @@ function buildFilterBy(filters = {}) {
 }
 
 // Build a documents/search query string from a params object. `filters` is
-// lifted into filter_by; everything else is passed through as-is.
+// lifted into filter_by; `ranges` add numeric comparisons; an explicit
+// `filter_by` string (if provided) is AND-merged last.
 function buildSearchQs(params = {}) {
-  const { filters, ...rest } = params;
+  const { filters, ranges, filter_by: extraFilter, ...rest } = params;
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(rest)) {
     if (v === undefined || v === null) continue;
     qs.set(k, String(v));
   }
-  const filterBy = buildFilterBy(filters);
-  if (filterBy) qs.set("filter_by", filterBy);
+  const parts = [buildFilterBy(filters), buildRangeFilter(ranges), extraFilter].filter(Boolean);
+  if (parts.length) qs.set("filter_by", parts.join(" && "));
   return qs.toString();
 }
 
@@ -225,15 +289,24 @@ async function request(config, method, pathAndQuery, { body, jsonl, timeoutMs } 
 // ---------------------------------------------------------------------------
 
 // Reachability + mode check. Returns { ok, disabled?, error? }. Fast timeout so
-// a down server doesn't stall the UI.
+// a down server doesn't stall the UI. Results are cached briefly (see
+// HEALTH_CACHE_MS) so repeated analyze calls while Typesense is down stay snappy.
 async function health(config = getConfig()) {
   if (!config.enabled) return { ok: false, disabled: true };
+  const key = `${config.baseUrl}|${config.apiKey || ""}`;
+  const now = Date.now();
+  if (healthCache.key === key && now - healthCache.at < HEALTH_CACHE_MS && healthCache.result) {
+    return healthCache.result;
+  }
+  let result;
   try {
     const res = await request(config, "GET", "/health", { timeoutMs: HEALTH_TIMEOUT_MS });
-    return { ok: Boolean(res && res.ok) };
+    result = { ok: Boolean(res && res.ok) };
   } catch (err) {
-    return { ok: false, error: err.message };
+    result = { ok: false, error: err.message };
   }
+  healthCache = { key, at: now, result };
+  return result;
 }
 
 async function ensureCollection(config, schema) {
@@ -327,10 +400,10 @@ async function search(config, name, params) {
 // search). `searches` is an array of { collection, ...params }.
 async function multiSearch(config, searches) {
   const body = {
-    searches: searches.map(({ collection, filters, ...rest }) => {
+    searches: searches.map(({ collection, filters, ranges, filter_by: extraFilter, ...rest }) => {
       const entry = { collection, ...rest };
-      const filterBy = buildFilterBy(filters);
-      if (filterBy) entry.filter_by = filterBy;
+      const parts = [buildFilterBy(filters), buildRangeFilter(ranges), extraFilter].filter(Boolean);
+      if (parts.length) entry.filter_by = parts.join(" && ");
       return entry;
     }),
   };
@@ -350,6 +423,7 @@ module.exports = {
   // pure helpers (exported for tests)
   resolveConfig,
   buildFilterBy,
+  buildRangeFilter,
   buildSearchQs,
   SCHEMAS,
   DEFAULTS,
@@ -363,6 +437,7 @@ module.exports = {
   documentCount,
   importDocuments,
   upsertDocument,
+  updateDocument,
   deleteByFilter,
   search,
   multiSearch,

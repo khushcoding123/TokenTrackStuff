@@ -11,6 +11,22 @@
     <script src="theme-init.js"></script>
   </head>
   <body>
+    <!-- Phase 6 — global Metriq search (Cmd/Ctrl+K) -->
+    <div id="global-search-overlay" class="gs-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gs-title">
+      <div class="gs-panel">
+        <div class="gs-header">
+          <svg class="icon icon-sm gs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          <input id="gs-input" class="gs-input" type="search" placeholder="Search code, prompts, usage…" autocomplete="off" aria-label="Global search" />
+          <kbd class="gs-kbd">Esc</kbd>
+        </div>
+        <p id="gs-hint" class="gs-hint muted">Type to search across the active project, previous prompts, and usage sessions.</p>
+        <div id="gs-results" class="gs-results"></div>
+        <div id="gs-empty" class="gs-empty muted hidden">No matches. Try different keywords, or index a project in Settings.</div>
+      </div>
+    </div>
+
     <main id="app">
       <!-- Logged-out view -->
       <section id="view-login" class="view">
@@ -291,8 +307,20 @@
               <div id="ps-files-block" class="section-block hidden">
                 <div class="section-header">
                   <h2>Relevant files found</h2>
+                  <span id="ps-context-source" class="ps-context-source muted"></span>
                 </div>
                 <div id="ps-files" class="ps-files"></div>
+                <details id="ps-why-files" class="ps-why-files hidden">
+                  <summary>Why these files?</summary>
+                  <ul id="ps-why-list" class="ps-why-list"></ul>
+                </details>
+              </div>
+
+              <div id="ps-similar-block" class="section-block hidden">
+                <div class="section-header">
+                  <h2>Similar previous tasks</h2>
+                </div>
+                <ul id="ps-similar-list" class="ps-similar-list"></ul>
               </div>
 
               <div class="section-block">
@@ -533,8 +561,9 @@
               <section class="usg-card" aria-labelledby="usg-sessions-title">
                 <div class="section-header usg-sessions-head">
                   <h2 id="usg-sessions-title">Recent sessions</h2>
-                  <input id="usage-search" class="input usg-search" type="text" placeholder="Search project, model, id…" />
+                  <input id="usage-search" class="input usg-search" type="text" placeholder="Search: expensive auth, low cache, project…" />
                 </div>
+                <p id="usage-search-source" class="muted usg-search-source hidden"></p>
                 <div class="usg-table-wrap desktop-only-table">
                   <table class="usg-table">
                     <thead>
@@ -874,6 +903,115 @@
                   </div>
                   <span id="settings-hotkey-label" class="set-row-value set-kbd"></span>
                 </div>
+              </div>
+            </section>
+
+            <!-- Project Intelligence (Typesense) -->
+            <section class="set-card" aria-labelledby="set-title-typesense">
+              <div class="set-section-title" id="set-title-typesense">
+                <span class="set-section-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                  </svg>
+                </span>
+                <h2>Project Intelligence</h2>
+              </div>
+              <p class="muted set-section-sub">
+                Optional Typesense search improves file discovery for prompts. Local mode is recommended for full code indexing. Cloud indexing of source code requires explicit consent.
+              </p>
+
+              <div class="set-rows">
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Connection</span>
+                      <span id="ts-status-desc" class="set-row-desc">Checking…</span>
+                    </div>
+                  </div>
+                  <span id="ts-status-pill" class="set-permission-pill muted">…</span>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 7h16M4 12h10M4 17h7" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Mode</span>
+                      <span class="set-row-desc">Off disables Typesense. Local indexes full code. Cloud is metadata-only unless you consent.</span>
+                    </div>
+                  </div>
+                  <select id="ts-mode-select" class="set-select" aria-label="Typesense mode">
+                    <option value="off">Off</option>
+                    <option value="local">Local</option>
+                    <option value="cloud">Cloud</option>
+                  </select>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 7h18v10H3z" /><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Index status</span>
+                      <span id="ts-index-desc" class="set-row-desc">No project indexed yet.</span>
+                    </div>
+                  </div>
+                  <button id="btn-ts-reindex" class="ov-btn-secondary" type="button">Reindex</button>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3v18M3 12h18" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Conceptual search</span>
+                      <span class="set-row-desc">Expand vague prompts with synonyms (e.g. “tokens consumed” → usage files). Keyword search stays the default.</span>
+                    </div>
+                  </div>
+                  <div class="set-switch-control">
+                    <span id="ts-hybrid-label" class="set-switch-state muted">Off</span>
+                    <button id="btn-ts-hybrid" class="set-switch" role="switch" aria-checked="false" aria-label="Conceptual search"></button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="ts-cloud-consent" class="ts-cloud-consent hidden">
+                <label class="ts-consent-label">
+                  <input id="ts-cloud-code-consent" type="checkbox" />
+                  <span>
+                    I understand cloud mode will upload source-code content to my Typesense host, and I consent to indexing project contents.
+                  </span>
+                </label>
+              </div>
+
+              <div class="set-repo-block">
+                <label class="set-row-title" for="ts-host-input">Typesense host</label>
+                <div class="set-repo-input-row">
+                  <select id="ts-protocol-select" class="set-select ts-protocol" aria-label="Protocol">
+                    <option value="http">http</option>
+                    <option value="https">https</option>
+                  </select>
+                  <input id="ts-host-input" class="set-input" type="text" placeholder="localhost" autocomplete="off" />
+                  <input id="ts-port-input" class="set-input ts-port" type="text" placeholder="8108" autocomplete="off" aria-label="Port" />
+                  <button id="btn-ts-save" class="ov-btn-primary" type="button">Save</button>
+                </div>
+                <label class="set-row-title" for="ts-api-key-input">API key</label>
+                <input id="ts-api-key-input" class="set-input" type="password" placeholder="Stored securely — leave blank to keep current" autocomplete="off" />
+                <p id="ts-config-status" class="muted set-repo-status">Key never leaves the main process.</p>
               </div>
             </section>
 

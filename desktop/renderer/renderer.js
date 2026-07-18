@@ -462,6 +462,11 @@
   const psIssues = document.getElementById("ps-issues");
   const psFilesBlock = document.getElementById("ps-files-block");
   const psFiles = document.getElementById("ps-files");
+  const psContextSource = document.getElementById("ps-context-source");
+  const psWhyFiles = document.getElementById("ps-why-files");
+  const psWhyList = document.getElementById("ps-why-list");
+  const psSimilarBlock = document.getElementById("ps-similar-block");
+  const psSimilarList = document.getElementById("ps-similar-list");
   const psFocused = document.getElementById("ps-focused");
   const psBtnCopy = document.getElementById("ps-btn-copy");
   const psBtnSnapshot = document.getElementById("ps-btn-snapshot");
@@ -471,6 +476,7 @@
 
   let psInitialized = false;
   let psDebounceTimer = null;
+  let psSimilarTimer = null;
   let psLatestResult = null;
   let psVersionCounter = 0;
   const psHistory = []; // session-only: { version, timestamp, prompt, result }
@@ -544,9 +550,110 @@
       psFiles.append(span);
     }
 
+    if (psContextSource) {
+      const src = result.contextSource || "none";
+      psContextSource.textContent =
+        src === "typesense" ? "via Project Intelligence" : src === "scanner" ? "via local scan" : "";
+    }
+
+    const matches = result.contextMatches || [];
+    if (psWhyFiles && psWhyList) {
+      psWhyList.innerHTML = "";
+      if (matches.length && result.contextSource === "typesense") {
+        psWhyFiles.classList.remove("hidden");
+        for (const m of matches) {
+          const li = document.createElement("li");
+          const title = document.createElement("strong");
+          title.textContent = m.file || "";
+          const detail = document.createElement("span");
+          const bits = [];
+          if (m.symbol) bits.push(`symbol ${m.symbol}`);
+          if (m.reasons?.length) bits.push(m.reasons.join("; "));
+          detail.textContent = bits.length ? ` — ${bits.join(" · ")}` : "";
+          detail.className = "muted";
+          li.append(title, detail);
+          if (m.snippet) {
+            const snip = document.createElement("pre");
+            snip.className = "ps-why-snippet";
+            snip.textContent = m.snippet.replace(/<\/?mark>/gi, "");
+            li.append(snip);
+          }
+          psWhyList.append(li);
+        }
+      } else {
+        psWhyFiles.classList.add("hidden");
+      }
+    }
+
     psFocused.textContent = result.focusedPrompt;
     psLatestResult = result;
     psUpdateToolbar();
+  }
+
+  function psRenderSimilar(items) {
+    if (!psSimilarBlock || !psSimilarList) return;
+    psSimilarList.innerHTML = "";
+    if (!items?.length) {
+      psSimilarBlock.classList.add("hidden");
+      return;
+    }
+    psSimilarBlock.classList.remove("hidden");
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.className = "ps-similar-item";
+
+      const prompt = document.createElement("p");
+      prompt.className = "ps-similar-prompt";
+      const text = item.originalPrompt || "";
+      prompt.textContent = text.length > 110 ? text.slice(0, 110) + "…" : text;
+
+      const meta = document.createElement("p");
+      meta.className = "ps-similar-meta muted";
+      const saved = item.estimatedTokensSaved || 0;
+      const files = (item.relevantFiles || []).slice(0, 3).join(", ");
+      meta.textContent = [
+        saved > 0 ? `Saved approximately ${saved.toLocaleString()} tokens` : null,
+        files ? `Files used: ${files}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      const actions = document.createElement("div");
+      actions.className = "ps-similar-actions";
+
+      const reuseBtn = document.createElement("button");
+      reuseBtn.type = "button";
+      reuseBtn.className = "link-btn";
+      reuseBtn.textContent = "Reuse optimized prompt";
+      reuseBtn.addEventListener("click", () => {
+        if (item.optimizedPrompt) {
+          psInput.value = item.optimizedPrompt;
+          psInput.dispatchEvent(new Event("input"));
+          psInput.focus();
+        }
+      });
+
+      actions.append(reuseBtn);
+      if (item.relevantFiles?.length) {
+        const viewBtn = document.createElement("button");
+        viewBtn.type = "button";
+        viewBtn.className = "link-btn";
+        viewBtn.textContent = "View files";
+        viewBtn.addEventListener("click", () => {
+          psFilesBlock.classList.remove("hidden");
+          psFiles.innerHTML = "";
+          for (const file of item.relevantFiles) {
+            const span = document.createElement("span");
+            span.textContent = file;
+            psFiles.append(span);
+          }
+        });
+        actions.append(viewBtn);
+      }
+
+      li.append(prompt, meta, actions);
+      psSimilarList.append(li);
+    }
   }
 
   function psClearResult() {
@@ -555,6 +662,8 @@
     psHeaderBadge.textContent = "Ready";
     psHeaderBadge.classList.add("ps-header-badge-idle");
     psLatestResult = null;
+    if (psSimilarBlock) psSimilarBlock.classList.add("hidden");
+    if (psWhyFiles) psWhyFiles.classList.add("hidden");
     psUpdateToolbar();
   }
 
@@ -661,6 +770,15 @@
         const result = await window.metriq.analyzePrompt(prompt);
         psRenderResult(result);
       }, 350);
+      clearTimeout(psSimilarTimer);
+      psSimilarTimer = setTimeout(async () => {
+        try {
+          const similar = await window.metriq.findSimilarPrompts(prompt);
+          psRenderSimilar(similar);
+        } catch {
+          psRenderSimilar([]);
+        }
+      }, 600);
     });
 
     psBtnClear.addEventListener("click", () => {
@@ -677,6 +795,7 @@
         savedTokens: psLatestResult.savedTokens,
         savedPct: psLatestResult.savedPct,
         rating: psLatestResult.rating,
+        promptRunId: psLatestResult.promptRunId || null,
       });
       refreshStats(); // same real capture stats Overview/Impact read — keep them in sync
       const original = psBtnCopy.textContent;
@@ -716,6 +835,7 @@
         initPromptStudio();
         psRefreshContext();
       }
+      if (btn.dataset.page === "settings") refreshTypesenseStatus();
     });
   }
 
@@ -768,6 +888,7 @@
     initPresets();
     renderOverviewTools();
     initAccessibility();
+    initTypesenseSettings();
     refreshStats();
   }
 
@@ -1028,6 +1149,161 @@
   async function initPresets() {
     if (!itgPresetGrid) return;
     renderPresetStates(new Set(await window.metriq.getTools()));
+  }
+
+  // --- Project Intelligence (Typesense) -----------------------------------
+
+  const tsStatusPill = document.getElementById("ts-status-pill");
+  const tsStatusDesc = document.getElementById("ts-status-desc");
+  const tsIndexDesc = document.getElementById("ts-index-desc");
+  const tsModeSelect = document.getElementById("ts-mode-select");
+  const tsProtocolSelect = document.getElementById("ts-protocol-select");
+  const tsHostInput = document.getElementById("ts-host-input");
+  const tsPortInput = document.getElementById("ts-port-input");
+  const tsApiKeyInput = document.getElementById("ts-api-key-input");
+  const tsCloudConsent = document.getElementById("ts-cloud-consent");
+  const tsCloudCodeConsent = document.getElementById("ts-cloud-code-consent");
+  const tsConfigStatus = document.getElementById("ts-config-status");
+  const btnTsSave = document.getElementById("btn-ts-save");
+  const btnTsReindex = document.getElementById("btn-ts-reindex");
+  const btnTsHybrid = document.getElementById("btn-ts-hybrid");
+  const tsHybridLabel = document.getElementById("ts-hybrid-label");
+  let tsSettingsInitialized = false;
+
+  function applyTypesenseStatus(status) {
+    if (!status) return;
+    if (tsModeSelect) tsModeSelect.value = status.mode || "local";
+    if (tsProtocolSelect) tsProtocolSelect.value = status.protocol || "http";
+    if (tsHostInput && document.activeElement !== tsHostInput) tsHostInput.value = status.host || "";
+    if (tsPortInput && document.activeElement !== tsPortInput) tsPortInput.value = status.port || "";
+    if (tsCloudCodeConsent) tsCloudCodeConsent.checked = Boolean(status.cloudCodeConsent);
+    if (tsCloudConsent) tsCloudConsent.classList.toggle("hidden", status.mode !== "cloud");
+    if (btnTsHybrid) {
+      const on = Boolean(status.hybridSearch);
+      btnTsHybrid.setAttribute("aria-checked", String(on));
+      if (tsHybridLabel) tsHybridLabel.textContent = on ? "On" : "Off";
+    }
+
+    if (tsStatusPill && tsStatusDesc) {
+      if (status.disabled || status.mode === "off") {
+        tsStatusPill.textContent = "Off";
+        tsStatusPill.className = "set-permission-pill muted";
+        tsStatusDesc.textContent = "Typesense disabled — using the local file scanner.";
+      } else if (status.healthy) {
+        tsStatusPill.textContent = "Connected";
+        tsStatusPill.className = "set-permission-pill is-ok";
+        tsStatusDesc.textContent = `${status.protocol}://${status.host}:${status.port}` +
+          (status.indexesCode ? " · full code index" : " · metadata-only") +
+          (status.hybridSearch ? " · conceptual search" : "");
+      } else {
+        tsStatusPill.textContent = "Unavailable";
+        tsStatusPill.className = "set-permission-pill is-warn";
+        tsStatusDesc.textContent = status.error || "Server unreachable — scanner fallback active.";
+      }
+    }
+
+    if (tsIndexDesc) {
+      const idx = status.index;
+      if (!idx) {
+        tsIndexDesc.textContent = "No project indexed yet. Link a project or click Reindex.";
+      } else if (idx.status === "indexing") {
+        tsIndexDesc.textContent = "Indexing in progress…";
+      } else if (idx.status === "error") {
+        tsIndexDesc.textContent = idx.error || "Last index failed.";
+      } else {
+        const when = idx.indexedAt ? timeAgo(new Date(idx.indexedAt).toISOString()) : "unknown";
+        tsIndexDesc.textContent =
+          `${(idx.fileCount || 0).toLocaleString()} files · ${(idx.chunkCount || 0).toLocaleString()} chunks · ${when}`;
+      }
+    }
+  }
+
+  async function refreshTypesenseStatus() {
+    if (!window.metriq.getTypesenseStatus) return;
+    try {
+      const status = await window.metriq.getTypesenseStatus();
+      applyTypesenseStatus(status);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function initTypesenseSettings() {
+    if (tsSettingsInitialized || !tsModeSelect) return;
+    tsSettingsInitialized = true;
+
+    refreshTypesenseStatus();
+
+    tsModeSelect.addEventListener("change", async () => {
+      const mode = tsModeSelect.value;
+      if (tsCloudConsent) tsCloudConsent.classList.toggle("hidden", mode !== "cloud");
+      const status = await window.metriq.setTypesenseConfig({ mode });
+      applyTypesenseStatus(status);
+    });
+
+    tsCloudCodeConsent?.addEventListener("change", async () => {
+      const status = await window.metriq.setTypesenseConfig({
+        cloudCodeConsent: tsCloudCodeConsent.checked,
+      });
+      applyTypesenseStatus(status);
+    });
+
+    btnTsHybrid?.addEventListener("click", async () => {
+      const current = btnTsHybrid.getAttribute("aria-checked") === "true";
+      const status = await window.metriq.setTypesenseConfig({ hybridSearch: !current });
+      applyTypesenseStatus(status);
+    });
+
+    btnTsSave?.addEventListener("click", async () => {
+      const patch = {
+        mode: tsModeSelect.value,
+        protocol: tsProtocolSelect?.value || "http",
+        host: (tsHostInput?.value || "").trim() || "localhost",
+        port: (tsPortInput?.value || "").trim() || "8108",
+        cloudCodeConsent: Boolean(tsCloudCodeConsent?.checked),
+      };
+      const key = tsApiKeyInput?.value?.trim();
+      if (key) patch.apiKey = key;
+      const status = await window.metriq.setTypesenseConfig(patch);
+      if (tsApiKeyInput) tsApiKeyInput.value = "";
+      if (tsConfigStatus) tsConfigStatus.textContent = "Saved. Key stays in the main process.";
+      applyTypesenseStatus(status);
+    });
+
+    btnTsReindex?.addEventListener("click", async () => {
+      btnTsReindex.disabled = true;
+      const original = btnTsReindex.textContent;
+      btnTsReindex.textContent = "Indexing…";
+      if (tsIndexDesc) tsIndexDesc.textContent = "Indexing in progress…";
+      try {
+        const result = await window.metriq.reindexTypesense();
+        if (result?.ok) {
+          if (tsIndexDesc) {
+            tsIndexDesc.textContent =
+              `${(result.fileCount || 0).toLocaleString()} files · ${(result.chunkCount || 0).toLocaleString()} chunks indexed`;
+          }
+        } else if (tsIndexDesc) {
+          tsIndexDesc.textContent = result?.error || "Index failed — scanner fallback still works.";
+        }
+      } finally {
+        btnTsReindex.disabled = false;
+        btnTsReindex.textContent = original;
+        refreshTypesenseStatus();
+      }
+    });
+
+    window.metriq.onTypesenseIndexProgress?.((payload) => {
+      if (!payload || !tsIndexDesc) return;
+      if (payload.status === "indexing") {
+        const total = payload.total || 0;
+        const processed = payload.processed || 0;
+        tsIndexDesc.textContent = total
+          ? `Indexing… ${processed}/${total} files`
+          : "Indexing…";
+      } else if (payload.done) {
+        refreshTypesenseStatus();
+      }
+    });
   }
 
   // --- Accessibility ------------------------------------------------------
@@ -2400,15 +2676,61 @@
     });
   }
 
+  const usageSearchSource = document.getElementById("usage-search-source");
+  let usageTsHits = null; // Typesense-ranked session ids when NL search succeeds
+  let usageSearchTimer = null;
+
   function getFilteredUsageSessions() {
     const sessions = latestUsageData?.sessions || [];
     const q = usageQuery.trim().toLowerCase();
-    if (!q) return sessions;
+    if (!q) {
+      if (usageSearchSource) usageSearchSource.classList.add("hidden");
+      return sessions;
+    }
+
+    // Prefer Typesense ranking when available (Phase 5).
+    if (usageTsHits?.length) {
+      const byId = new Map(sessions.map((s) => [`${s.source}:${s.sessionId}`, s]));
+      const ranked = [];
+      for (const hit of usageTsHits) {
+        const key = `${hit.tool}:${hit.sessionId}`;
+        if (byId.has(key)) ranked.push(byId.get(key));
+      }
+      if (ranked.length) {
+        if (usageSearchSource) {
+          usageSearchSource.classList.remove("hidden");
+          usageSearchSource.textContent = "Ranked by Project Intelligence";
+        }
+        return ranked;
+      }
+    }
+
+    if (usageSearchSource) {
+      usageSearchSource.classList.remove("hidden");
+      usageSearchSource.textContent = "Local filter (Typesense unavailable or no matches)";
+    }
     return sessions.filter((session) =>
       session.sessionId.toLowerCase().includes(q) ||
       String(session.project || "").toLowerCase().includes(q) ||
-      (session.models || []).some((model) => model.toLowerCase().includes(q))
+      (session.models || []).some((model) => model.toLowerCase().includes(q)) ||
+      String(session.source || "").toLowerCase().includes(q)
     );
+  }
+
+  async function runUsageTypesenseSearch(q) {
+    if (!q || !window.metriq.searchUsageSessions) {
+      usageTsHits = null;
+      return;
+    }
+    try {
+      const filters = {};
+      if (selectedUsageSource && selectedUsageSource !== "all") {
+        filters.tool = selectedUsageSource;
+      }
+      usageTsHits = await window.metriq.searchUsageSessions({ q, filters, limit: 50 });
+    } catch {
+      usageTsHits = null;
+    }
   }
 
   function renderUsageSessions() {
@@ -2498,6 +2820,17 @@
   usageSearch?.addEventListener("input", (event) => {
     usageQuery = event.target.value;
     usagePage = 1;
+    clearTimeout(usageSearchTimer);
+    const q = usageQuery.trim();
+    if (!q) {
+      usageTsHits = null;
+      renderUsageSessions();
+      return;
+    }
+    usageSearchTimer = setTimeout(async () => {
+      await runUsageTypesenseSearch(q);
+      renderUsageSessions();
+    }, 280);
     renderUsageSessions();
   });
   usagePagePrev?.addEventListener("click", () => {
@@ -2510,6 +2843,147 @@
     renderUsageSessions();
   });
   btnRefreshUsage?.addEventListener("click", () => refreshUsage());
+
+  // --- Phase 6: Cmd/Ctrl+K global search ----------------------------------
+
+  const gsOverlay = document.getElementById("global-search-overlay");
+  const gsInput = document.getElementById("gs-input");
+  const gsResults = document.getElementById("gs-results");
+  const gsEmpty = document.getElementById("gs-empty");
+  const gsHint = document.getElementById("gs-hint");
+  let gsTimer = null;
+
+  function openGlobalSearch() {
+    if (!gsOverlay) return;
+    gsOverlay.classList.remove("hidden");
+    if (gsInput) {
+      gsInput.value = "";
+      gsInput.focus();
+    }
+    if (gsResults) gsResults.innerHTML = "";
+    if (gsEmpty) gsEmpty.classList.add("hidden");
+    if (gsHint) {
+      gsHint.textContent =
+        "Type to search across the active project, previous prompts, and usage sessions.";
+    }
+  }
+
+  function closeGlobalSearch() {
+    gsOverlay?.classList.add("hidden");
+  }
+
+  function gsRenderGroup(title, items, onPick) {
+    if (!items.length) return null;
+    const section = document.createElement("section");
+    section.className = "gs-group";
+    const h = document.createElement("h3");
+    h.className = "gs-group-title";
+    h.textContent = title;
+    section.append(h);
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gs-item";
+      const t = document.createElement("span");
+      t.className = "gs-item-title";
+      t.textContent = item.title;
+      const s = document.createElement("span");
+      s.className = "gs-item-sub muted";
+      s.textContent = item.subtitle || "";
+      btn.append(t, s);
+      btn.addEventListener("click", () => onPick(item));
+      section.append(btn);
+    }
+    return section;
+  }
+
+  async function runGlobalSearch(q) {
+    if (!gsResults || !window.metriq.globalSearch) return;
+    gsResults.innerHTML = "";
+    if (!q.trim()) {
+      gsEmpty?.classList.add("hidden");
+      return;
+    }
+    const res = await window.metriq.globalSearch(q);
+    if (gsHint) {
+      gsHint.textContent =
+        res.hybrid && res.expandedTerms?.length
+          ? `Conceptual expansion: ${res.expandedTerms.join(", ")}`
+          : res.source === "offline"
+            ? "Typesense offline — open Settings to connect, or use Prompt Studio’s local scan."
+            : "Select a result to jump.";
+    }
+
+    const codeEl = gsRenderGroup("Code", res.code || [], (item) => {
+      closeGlobalSearch();
+      showPage("prompt-studio");
+      initPromptStudio();
+      psRefreshContext();
+      const insert = item.symbol || item.filePath;
+      if (psInput && insert) {
+        const cur = psInput.value;
+        const pad = cur && !/\s$/.test(cur) ? " " : "";
+        psInput.value = `${cur}${pad}${insert}`;
+        psInput.dispatchEvent(new Event("input"));
+        psInput.focus();
+      }
+    });
+
+    const promptEl = gsRenderGroup("Previous prompts", res.prompts || [], (item) => {
+      closeGlobalSearch();
+      showPage("prompt-studio");
+      initPromptStudio();
+      if (psInput && item.optimizedPrompt) {
+        psInput.value = item.optimizedPrompt;
+        psInput.dispatchEvent(new Event("input"));
+        psInput.focus();
+      }
+    });
+
+    const usageEl = gsRenderGroup("Usage sessions", res.usage || [], (item) => {
+      closeGlobalSearch();
+      showPage("usage");
+      refreshUsage().then(() => {
+        if (usageSearch && item.sessionId) {
+          usageSearch.value = item.sessionId;
+          usageQuery = item.sessionId;
+          usagePage = 1;
+          runUsageTypesenseSearch(item.sessionId).then(() => renderUsageSessions());
+        }
+      });
+    });
+
+    for (const el of [codeEl, promptEl, usageEl]) {
+      if (el) gsResults.append(el);
+    }
+    const any =
+      (res.code || []).length + (res.prompts || []).length + (res.usage || []).length > 0;
+    gsEmpty?.classList.toggle("hidden", any);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      if (gsOverlay && !gsOverlay.classList.contains("hidden")) closeGlobalSearch();
+      else openGlobalSearch();
+      return;
+    }
+    if (e.key === "Escape" && gsOverlay && !gsOverlay.classList.contains("hidden")) {
+      e.preventDefault();
+      closeGlobalSearch();
+    }
+  });
+
+  gsOverlay?.addEventListener("click", (e) => {
+    if (e.target === gsOverlay) closeGlobalSearch();
+  });
+
+  gsInput?.addEventListener("input", () => {
+    clearTimeout(gsTimer);
+    const q = gsInput.value;
+    gsTimer = setTimeout(() => runGlobalSearch(q), 220);
+  });
 
   window.metriq.onAuthSuccess((session) => {
     if (session) showLoggedIn(session);

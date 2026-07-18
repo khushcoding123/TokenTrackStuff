@@ -38,6 +38,19 @@ test("resolveConfig: cloud mode indexes code only with explicit consent", () => 
   assert.strictEqual(consented.indexesCode, true);
 });
 
+test("resolveConfig: hybridSearch from env or prefs", () => {
+  assert.strictEqual(svc.resolveConfig({}, {}).hybridSearch, false);
+  assert.strictEqual(svc.resolveConfig({ TYPESENSE_HYBRID: "true" }, {}).hybridSearch, true);
+  assert.strictEqual(svc.resolveConfig({}, { hybridSearch: true }).hybridSearch, true);
+});
+
+test("buildRangeFilter: emits gte/lte clauses", () => {
+  assert.strictEqual(
+    svc.buildRangeFilter({ input_tokens: { gte: 50000 }, cost_usd: { lte: 2 } }),
+    "input_tokens:>=50000 && cost_usd:<=2"
+  );
+});
+
 test("resolveConfig: invalid mode falls back to default", () => {
   assert.strictEqual(svc.resolveConfig({ TYPESENSE_MODE: "bogus" }, {}).mode, "local");
 });
@@ -78,7 +91,10 @@ test("health: unreachable host resolves to { ok:false }, never throws", async ()
   assert.ok(res.error);
 });
 
-test("schemas: both collections defined with isolation keys", () => {
+test("schemas: all collections defined with isolation keys", () => {
+  assert.ok(svc.SCHEMAS.code_chunks);
+  assert.ok(svc.SCHEMAS.prompt_runs);
+  assert.ok(svc.SCHEMAS.usage_sessions);
   for (const schema of Object.values(svc.SCHEMAS)) {
     const names = schema.fields.map((f) => f.name);
     assert.ok(names.includes("user_id"), `${schema.name} has user_id`);

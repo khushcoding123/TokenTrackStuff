@@ -18,10 +18,20 @@ dev server instead of production, e.g.:
 METRIQ_WEB_URL=http://localhost:3411 npm start
 ```
 
+## Project Intelligence (Typesense)
+
+Optional. See [TYPESENSE.md](./TYPESENSE.md) for local Docker setup, env vars,
+privacy modes, and a manual verification checklist. When Typesense is off or
+unreachable, prompt analysis falls back to the offline scanner automatically.
+
+Phases shipped: code indexing, prompt file discovery, prompt memory, usage
+session search, Cmd/Ctrl+K global search, and optional conceptual (hybrid)
+query expansion. `packages/core` stays offline with zero Typesense deps.
+
 ## Test
 
 ```bash
-npm test              # pure-logic unit tests (protocol URL parsing, wrap protocol/server)
+npm test              # pure-logic + Typesense unit/live tests (live skip without a server)
 ```
 
 The unit tests don't require Electron itself. End-to-end verification (real

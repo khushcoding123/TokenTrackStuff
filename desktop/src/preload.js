@@ -98,4 +98,18 @@ contextBridge.exposeInMainWorld("metriq", {
   getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
 
   getUsage: (days, source) => ipcRenderer.invoke("usage:get", days, source),
+
+  // Typesense Project Intelligence — status/config/search only. The API key
+  // never crosses this bridge (main resolves it from env / safeStorage).
+  getTypesenseStatus: (projectId) => ipcRenderer.invoke("typesense:get-status", projectId),
+  setTypesenseConfig: (patch) => ipcRenderer.invoke("typesense:set-config", patch),
+  reindexTypesense: (projectId) => ipcRenderer.invoke("typesense:reindex", projectId),
+  findSimilarPrompts: (prompt) => ipcRenderer.invoke("typesense:find-similar", prompt),
+  searchUsageSessions: (opts) => ipcRenderer.invoke("typesense:search-usage", opts),
+  globalSearch: (q) => ipcRenderer.invoke("typesense:global-search", q),
+  onTypesenseIndexProgress: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("typesense:index-progress", listener);
+    return () => ipcRenderer.removeListener("typesense:index-progress", listener);
+  },
 });

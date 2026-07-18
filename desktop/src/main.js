@@ -14,6 +14,9 @@ const { optimize } = require("../../packages/core/rewrite.js");
 const typesense = require("./typesense-service");
 const codeIndexer = require("./code-indexer");
 const contextSearch = require("./context-search");
+const promptMemory = require("./prompt-memory");
+const usageIndexer = require("./usage-indexer");
+const globalSearch = require("./global-search");
 const { recommend } = require("../../packages/optimize/index.js");
 const permissions = require("./permissions");
 const { PromptWatcher, looksLikePrompt } = require("./prompt-watcher");
@@ -669,6 +672,152 @@ if (!gotSingleInstanceLock) {
     return { files, scannedAt: new Date().toISOString() };
   }
 
+  // --- Typesense Project Intelligence helpers -----------------------------
+  // Session has email/name but no InsForge user uuid in the auth-callback
+  // payload today — email is a stable per-account isolation key for the
+  // local/cloud index. Falls back to "local" when signed out (shouldn't
+  // happen for linked projects, which require auth).
+  function typesenseUserId() {
+    const session = loadSession();
+    return session?.email || session?.userId || "local";
+  }
+
+  // Sanitize config for the renderer — NEVER include the API key.
+  function typesensePublicConfig(config = typesense.getConfig()) {
+    const prefsTs = loadPrefs().typesense || {};
+    return {
+      mode: config.mode,
+      enabled: config.enabled,
+      protocol: config.protocol,
+      host: config.host,
+      port: config.port,
+      indexesCode: config.indexesCode,
+      hybridSearch: Boolean(config.hybridSearch),
+      cloudCodeConsent: prefsTs.cloudCodeConsent === true,
+      hasApiKey: Boolean(prefsTs.apiKeyEnc || prefsTs.apiKey || process.env.TYPESENSE_API_KEY),
+    };
+  }
+
+  async function typesenseStatus(projectId = null) {
+    const config = typesense.getConfig();
+    const health = await typesense.health(config);
+    const id = projectId || loadPrefs().activeProject?.id || null;
+    const meta = id ? loadIndexMeta(id) : null;
+    return {
+      ...typesensePublicConfig(config),
+      healthy: health.ok,
+      disabled: Boolean(health.disabled),
+      error: health.error || null,
+      index: meta
+        ? {
+            projectId: id,
+            fileCount: meta.fileCount ?? 0,
+            chunkCount: meta.chunkCount ?? 0,
+            indexedAt: meta.indexedAt || null,
+            status: meta.status || "unknown",
+            error: meta.error || null,
+          }
+        : null,
+    };
+  }
+
+  function persistTypesensePrefs(patch) {
+    const prev = loadPrefs().typesense || {};
+    const next = { ...prev };
+    if (patch.mode !== undefined) next.mode = patch.mode;
+    if (patch.protocol !== undefined) next.protocol = patch.protocol;
+    if (patch.host !== undefined) next.host = patch.host;
+    if (patch.port !== undefined) next.port = String(patch.port);
+    if (patch.cloudCodeConsent !== undefined) next.cloudCodeConsent = Boolean(patch.cloudCodeConsent);
+    if (patch.hybridSearch !== undefined) next.hybridSearch = Boolean(patch.hybridSearch);
+    if (patch.apiKey !== undefined && patch.apiKey !== "" && patch.apiKey !== null) {
+      try {
+        const { safeStorage } = require("electron");
+        if (safeStorage.isEncryptionAvailable()) {
+          next.apiKeyEnc = safeStorage.encryptString(String(patch.apiKey)).toString("base64");
+          delete next.apiKey;
+        } else {
+          next.apiKey = String(patch.apiKey);
+          delete next.apiKeyEnc;
+        }
+      } catch {
+        next.apiKey = String(patch.apiKey);
+      }
+    }
+    savePrefs({ typesense: next });
+    return typesensePublicConfig();
+  }
+
+  // Index a project's source into Typesense. Progress events go to the
+  // renderer; failures never throw into the link/rescan path.
+  async function indexProjectFully(project, files, { force = false } = {}) {
+    if (!project?.id || !project?.path) {
+      return { ok: false, error: "No project" };
+    }
+    const config = typesense.getConfig();
+    if (!config.enabled) {
+      return { ok: false, disabled: true, error: "Typesense is off" };
+    }
+    const fileList = files || loadFileIndex(project.id)?.files || listSourceFiles(project.path);
+    const previous = force ? {} : loadIndexMeta(project.id)?.hashes || {};
+    const sendProgress = (payload) => {
+      mainWindow?.webContents.send("typesense:index-progress", {
+        projectId: project.id,
+        ...payload,
+      });
+    };
+    sendProgress({ status: "indexing", processed: 0, total: fileList.length });
+    try {
+      const result = await codeIndexer.indexProject({
+        config,
+        userId: typesenseUserId(),
+        projectId: project.id,
+        root: project.path,
+        files: fileList,
+        previousHashes: previous,
+        onProgress: ({ processed, total, chunks }) => {
+          sendProgress({ status: "indexing", processed, total, chunks });
+        },
+      });
+      if (result.ok) {
+        saveIndexMeta(project.id, {
+          hashes: result.hashes,
+          fileCount: result.fileCount,
+          chunkCount: result.chunkCount,
+          indexedAt: result.indexedAt,
+          status: "ready",
+        });
+        sendProgress({
+          status: "ready",
+          done: true,
+          fileCount: result.fileCount,
+          chunkCount: result.chunkCount,
+          indexedAt: result.indexedAt,
+        });
+      } else {
+        saveIndexMeta(project.id, {
+          ...(loadIndexMeta(project.id) || {}),
+          status: result.disabled ? "disabled" : "error",
+          error: result.error || "Index failed",
+        });
+        sendProgress({ status: "error", done: true, error: result.error });
+      }
+      return result;
+    } catch (err) {
+      saveIndexMeta(project.id, {
+        ...(loadIndexMeta(project.id) || {}),
+        status: "error",
+        error: err.message,
+      });
+      sendProgress({ status: "error", done: true, error: err.message });
+      return { ok: false, error: err.message };
+    }
+  }
+
+  function indexProjectInBackground(project, files, opts) {
+    indexProjectFully(project, files, opts).catch(() => {});
+  }
+
   // Accepts a full GitHub URL (https://github.com/owner/repo, with or
   // without .git/trailing slash), an SSH remote (git@github.com:owner/repo),
   // or the bare "owner/repo" shorthand. Returns null (not a thrown error)
@@ -739,6 +888,9 @@ if (!gotSingleInstanceLock) {
 
     saveFileIndex(project.id, { files, scannedAt });
     savePrefs({ activeProject: { id: project.id, name: project.name, path: project.path } });
+    // Typesense indexing is opt-in via TYPESENSE_MODE (default local). When
+    // the server is down this no-ops gracefully — scanner fallback still works.
+    indexProjectInBackground(project, files);
     return project;
   });
 
@@ -775,6 +927,7 @@ if (!gotSingleInstanceLock) {
 
     saveFileIndex(project.id, { files, scannedAt });
     savePrefs({ activeProject: { id: project.id, name: project.name, path: project.path } });
+    indexProjectInBackground(project, files);
     return project;
   });
 
@@ -790,6 +943,7 @@ if (!gotSingleInstanceLock) {
     }
     const { files, scannedAt } = scanFolder(project.path);
     saveFileIndex(project.id, { files, scannedAt });
+    indexProjectInBackground(project, files);
     return withAuthRetry((token) =>
       insforge.updateLinkedProject(token, project.id, {
         file_count: files.length,
@@ -802,6 +956,8 @@ if (!gotSingleInstanceLock) {
     const projectId = project.id;
     await withAuthRetry((token) => insforge.deleteLinkedProject(token, projectId));
     removeFileIndex(projectId);
+    removeIndexMeta(projectId);
+    codeIndexer.removeProjectIndex(typesense.getConfig(), projectId).catch(() => {});
     // Only a github-kind project has a Metriq-managed clone on disk worth
     // cleaning up — a local-kind project's path is the user's own folder.
     if (project.kind === "github" && project.path) {
@@ -1009,10 +1165,55 @@ if (!gotSingleInstanceLock) {
     tools: loadPrefs().tools ?? [],
   }));
 
-  ipcMain.handle("capture:analyze", (_event, prompt) => {
+  // Shared Typesense → scanner → optimize path used by Prompt Studio and the
+  // capture window. Typesense failures never break analysis.
+  async function analyzeWithProjectContext(prompt) {
     const activeProject = loadPrefs().activeProject;
-    const relevantFiles = activeProject ? findRelevantFiles(prompt, activeProject.path) : [];
-    const result = optimize(prompt, { relevantFiles });
+    const userId = typesenseUserId();
+    let relevantFiles = [];
+    let projectContext = null;
+    let contextMatches = [];
+    let contextSource = "none";
+    let hybrid = false;
+    let expandedTerms = [];
+
+    if (activeProject) {
+      const tsHit = await contextSearch.findRelevantFiles({
+        userId,
+        projectId: activeProject.id,
+        prompt,
+      });
+      if (tsHit?.projectContext?.files?.length) {
+        projectContext = tsHit.projectContext;
+        relevantFiles = projectContext.files;
+        contextMatches = tsHit.matches || [];
+        contextSource = "typesense";
+        hybrid = Boolean(tsHit.hybrid);
+        expandedTerms = tsHit.expandedTerms || [];
+      } else {
+        relevantFiles = findRelevantFiles(prompt, activeProject.path);
+        contextSource = relevantFiles.length ? "scanner" : "none";
+      }
+    }
+
+    const result = optimize(prompt, { relevantFiles, projectContext });
+
+    let promptRunId = null;
+    const tools = loadPrefs().tools || [];
+    const indexed = await promptMemory.indexPromptRun({
+      userId,
+      projectId: activeProject?.id || null,
+      originalPrompt: prompt,
+      optimizedPrompt: result.focused.text,
+      tool: tools[0] || null,
+      breadthScore: result.analysis.breadthScore,
+      projectedTokens: result.analysis.projectedTokens,
+      estimatedTokensSaved: result.savedTokens,
+      relevantFiles,
+      used: false,
+    });
+    if (indexed.ok) promptRunId = indexed.id;
+
     return {
       breadthScore: result.analysis.breadthScore,
       rating: result.analysis.rating,
@@ -1020,10 +1221,22 @@ if (!gotSingleInstanceLock) {
       promptTokens: result.analysis.promptTokens,
       projectedTokens: result.analysis.projectedTokens,
       relevantFiles,
+      contextMatches,
+      contextSource,
+      hybrid,
+      expandedTerms,
+      promptRunId,
       focusedPrompt: result.focused.text,
       savedTokens: result.savedTokens,
       savedPct: result.savedPct,
+      activeProject: activeProject
+        ? { id: activeProject.id, name: activeProject.name, path: activeProject.path }
+        : null,
     };
+  }
+
+  ipcMain.handle("capture:analyze", async (_event, prompt) => {
+    return analyzeWithProjectContext(prompt);
   });
 
   ipcMain.handle("capture:copy", (_event, text, stats) => {
@@ -1032,22 +1245,55 @@ if (!gotSingleInstanceLock) {
     if (stats) {
       const activeProject = loadPrefs().activeProject;
       recordCapture({ ...stats, projectName: activeProject?.name ?? null });
+      if (stats.promptRunId) {
+        promptMemory.markUsed(stats.promptRunId).catch(() => {});
+      }
     }
     return true;
   });
 
-  // GitHub-aware recommendation for the capture window: uses the connected repo
-  // URL to name the exact files to inspect. Shares @metriq/optimize with the
-  // web /optimize page, so the CLI-less desktop flow and the web give identical
-  // improved prompts. Falls back to a prompt-only rewrite if the repo read fails.
+  // Capture window recommendation. Prefer the active project's Typesense →
+  // scanner → optimize path (same as Prompt Studio). Fall back to the
+  // GitHub-aware @metriq/optimize pipeline when no project is linked.
+  // Optional AI-tailored rewrite then overlays improvedPrompt on either path.
   ipcMain.handle("capture:recommend", async (_event, prompt) => {
-    const repoUrl = loadPrefs().captureRepoUrl || null;
+    const activeProject = loadPrefs().activeProject;
     let rec;
-    try {
-      rec = await recommend(prompt, { repoUrl });
-    } catch (e) {
-      const fallback = await recommend(prompt, {});
-      rec = { ...fallback, repoError: e.message };
+    if (activeProject?.path) {
+      const local = await analyzeWithProjectContext(prompt);
+      rec = {
+        improvedPrompt: local.focusedPrompt,
+        analysis: {
+          rating: local.rating,
+          breadthScore: local.breadthScore,
+          issues: local.issues,
+          promptTokens: local.promptTokens,
+          projectedTokens: local.projectedTokens,
+        },
+        tokenSaving: {
+          savedTokens: local.savedTokens,
+          savedPct: local.savedPct,
+        },
+        relevantFiles: (local.relevantFiles || []).map((path, i) => ({
+          path,
+          reasons: local.contextMatches?.[i]?.reasons || [],
+        })),
+        contextSource: local.contextSource,
+        contextMatches: local.contextMatches,
+        promptRunId: local.promptRunId,
+        hybrid: local.hybrid,
+        activeProject: local.activeProject,
+        source: "project",
+        repo: null,
+      };
+    } else {
+      const repoUrl = loadPrefs().captureRepoUrl || null;
+      try {
+        rec = await recommend(prompt, { repoUrl });
+      } catch (e) {
+        const fallback = await recommend(prompt, {});
+        rec = { ...fallback, repoError: e.message };
+      }
     }
 
     // Optional AI-tailored rewrite (see ai-rewrite.js): only ever overrides
@@ -1109,6 +1355,9 @@ if (!gotSingleInstanceLock) {
     if (stats) {
       const activeProject = loadPrefs().activeProject;
       recordCapture({ ...stats, projectName: activeProject?.name ?? null });
+      if (stats.promptRunId) {
+        promptMemory.markUsed(stats.promptRunId).catch(() => {});
+      }
     }
     return { ok: true, applied };
   });
@@ -1287,6 +1536,17 @@ if (!gotSingleInstanceLock) {
       (sum, day) => sum + (day.behavior?.wastedTokens || 0),
       0
     );
+
+    // Phase 5: best-effort index of sessions for Typesense discovery. Never
+    // blocks or alters the deterministic aggregate payload.
+    usageIndexer
+      .indexUsageSessions({
+        userId: typesenseUserId(),
+        sessions: agg.sessions || [],
+        records: scopedRecords,
+      })
+      .catch(() => {});
+
     return {
       available: true,
       sources: telemetrySources,
@@ -1310,6 +1570,71 @@ if (!gotSingleInstanceLock) {
   ipcMain.handle("usage:get", (_event, days, selectedSource) => {
     const d = USAGE_VALID_DAYS.has(days) ? days : 30;
     return buildUsagePayload(d, selectedSource || "claude-code");
+  });
+
+  // --- Typesense Project Intelligence (IPC) -------------------------------
+  // All network I/O stays in main. The renderer only ever sees sanitized
+  // status / search results — never the API key or raw source documents.
+
+  ipcMain.handle("typesense:get-status", async (_event, projectId) => {
+    return typesenseStatus(projectId || null);
+  });
+
+  ipcMain.handle("typesense:set-config", async (_event, patch) => {
+    persistTypesensePrefs(patch || {});
+    // Cloud mode with code indexing requires explicit consent. Setting mode
+    // to cloud without consent leaves indexesCode=false (metadata-only).
+    return typesenseStatus();
+  });
+
+  ipcMain.handle("typesense:reindex", async (_event, projectId) => {
+    const prefs = loadPrefs();
+    let project = prefs.activeProject;
+    if (projectId && project?.id !== projectId) {
+      // Caller may pass a project id that isn't active — look it up from the
+      // linked list when possible; otherwise require the active project.
+      try {
+        const list = await withAuthRetry((token) => insforge.listLinkedProjects(token));
+        project = list.find((p) => p.id === projectId) || project;
+      } catch {
+        /* keep active */
+      }
+    }
+    if (!project) return { ok: false, error: "No project to index" };
+    return indexProjectFully(project, null, { force: true });
+  });
+
+  ipcMain.handle("typesense:find-similar", async (_event, prompt) => {
+    const activeProject = loadPrefs().activeProject;
+    return promptMemory.findSimilar({
+      userId: typesenseUserId(),
+      projectId: activeProject?.id || null,
+      prompt,
+      limit: 5,
+    });
+  });
+
+  // Phase 5 — natural-language / filtered usage discovery
+  ipcMain.handle("typesense:search-usage", async (_event, opts) => {
+    const o = opts || {};
+    return usageIndexer.searchUsageSessions({
+      userId: typesenseUserId(),
+      q: o.q || "*",
+      filters: o.filters || {},
+      ranges: o.ranges || {},
+      limit: o.limit || 25,
+    });
+  });
+
+  // Phase 6 — Cmd/Ctrl+K federated search
+  ipcMain.handle("typesense:global-search", async (_event, q) => {
+    const activeProject = loadPrefs().activeProject;
+    return globalSearch.globalSearch({
+      userId: typesenseUserId(),
+      projectId: activeProject?.id || null,
+      q,
+      limitPerGroup: 6,
+    });
   });
 
 }

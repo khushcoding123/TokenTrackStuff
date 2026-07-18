@@ -77,14 +77,31 @@
       savedTokens: s.savedTokens || 0,
       savedPct: s.savedPct || 0,
       rating: a.rating,
+      promptRunId: rec.promptRunId || null,
     };
 
-    aiBadgeEl.classList.toggle("hidden", !rec.aiTailored);
-    if (rec.aiError) {
-      aiNoteEl.textContent = "AI rewrite unavailable — showing offline rewrite";
-      aiNoteEl.classList.remove("hidden");
-    } else {
-      aiNoteEl.classList.add("hidden");
+    if (aiBadgeEl) aiBadgeEl.classList.toggle("hidden", !rec.aiTailored);
+    if (aiNoteEl) {
+      if (rec.aiError) {
+        aiNoteEl.textContent = "AI rewrite unavailable — showing offline rewrite";
+        aiNoteEl.classList.remove("hidden");
+      } else {
+        aiNoteEl.classList.add("hidden");
+      }
+    }
+
+    // Surface whether Project Intelligence found the files (active project path).
+    if (rec.source === "project" && contextEl) {
+      const via =
+        rec.contextSource === "typesense"
+          ? "Project Intelligence"
+          : rec.contextSource === "scanner"
+            ? "local scan"
+            : "active project";
+      const name = rec.activeProject?.name;
+      contextEl.textContent = name
+        ? `Scoped to ${name} · via ${via}`
+        : `Active project · via ${via}`;
     }
   }
 
