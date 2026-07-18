@@ -121,6 +121,21 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.capture-ai-badge {
+  text-transform: none;
+  color: var(--accent-primary);
+  letter-spacing: normal;
+  font-size: 11px;
+}
+
+.capture-ai-note {
+  font-size: 11px;
+  margin-top: 2px;
 }
 
 .capture-focused {

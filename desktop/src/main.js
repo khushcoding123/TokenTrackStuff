@@ -15,6 +15,8 @@ const permissions = require("./permissions");
 const { PromptWatcher, looksLikePrompt } = require("./prompt-watcher");
 const { WrapServer } = require("./wrap-server");
 const macAx = require("./mac-ax");
+const aiKeyStore = require("./ai-key-store");
+const aiRewrite = require("./ai-rewrite");
 // Same usage engine behind the web /usage dashboard and `metriq trace` — reads
 // this machine's real Claude Code + Codex logs (not the local capture-copy
 // stats in usage-stats.js above, which only track this app's own CTA clicks).
@@ -917,6 +919,49 @@ if (!gotSingleInstanceLock) {
     return true;
   });
 
+  // --- AI-tailored rewrite (Claude API key) --------------------------------
+  // Off by default. The key itself is stored encrypted via ai-key-store.js
+  // (safeStorage/OS keychain) and is never sent back to the renderer once
+  // saved — settings:get-ai-rewrite only ever returns a masked preview.
+
+  ipcMain.handle("settings:get-ai-rewrite", () => {
+    const p = loadPrefs().aiRewrite ?? {};
+    const key = aiKeyStore.loadApiKey();
+    return {
+      enabled: p.enabled ?? false,
+      model: p.model ?? aiRewrite.DEFAULT_MODEL,
+      models: aiRewrite.MODELS,
+      hasKey: !!key,
+      maskedKey: aiKeyStore.maskApiKey(key),
+    };
+  });
+
+  ipcMain.handle("settings:set-ai-rewrite", (_event, patch = {}) => {
+    if (typeof patch.apiKey === "string") {
+      if (patch.apiKey.trim()) aiKeyStore.saveApiKey(patch.apiKey.trim());
+      else aiKeyStore.clearApiKey();
+    }
+    const current = loadPrefs().aiRewrite ?? {};
+    const merged = {
+      enabled: patch.enabled ?? current.enabled ?? false,
+      model: patch.model ?? current.model ?? aiRewrite.DEFAULT_MODEL,
+    };
+    savePrefs({ aiRewrite: merged });
+    const key = aiKeyStore.loadApiKey();
+    return { ...merged, hasKey: !!key, maskedKey: aiKeyStore.maskApiKey(key) };
+  });
+
+  ipcMain.handle("settings:test-ai-key", async () => {
+    const apiKey = aiKeyStore.loadApiKey();
+    if (!apiKey) return { ok: false, error: "No Claude API key set." };
+    const { model } = loadPrefs().aiRewrite ?? {};
+    const result = await aiRewrite.rewriteWithClaude("Say the single word: ok", {
+      apiKey,
+      model: model || aiRewrite.DEFAULT_MODEL,
+    });
+    return result.ok ? { ok: true } : result;
+  });
+
   // --- Accessibility preferences -------------------------------------------
   // { highContrast, reduceMotion, dyslexiaFont, colorblind } — each a plain
   // boolean, or absent if the user has never touched that toggle (renderer.js
@@ -993,12 +1038,37 @@ if (!gotSingleInstanceLock) {
   // improved prompts. Falls back to a prompt-only rewrite if the repo read fails.
   ipcMain.handle("capture:recommend", async (_event, prompt) => {
     const repoUrl = loadPrefs().captureRepoUrl || null;
+    let rec;
     try {
-      return await recommend(prompt, { repoUrl });
+      rec = await recommend(prompt, { repoUrl });
     } catch (e) {
       const fallback = await recommend(prompt, {});
-      return { ...fallback, repoError: e.message };
+      rec = { ...fallback, repoError: e.message };
     }
+
+    // Optional AI-tailored rewrite (see ai-rewrite.js): only ever overrides
+    // improvedPrompt on success. analysis/relevantFiles/tokenSaving stay the
+    // offline heuristic result either way; a failed/disabled AI call just
+    // leaves the heuristic improvedPrompt in place as the fallback.
+    const ai = loadPrefs().aiRewrite ?? {};
+    if (ai.enabled) {
+      const apiKey = aiKeyStore.loadApiKey();
+      if (apiKey) {
+        const result = await aiRewrite.rewriteWithClaude(prompt, {
+          apiKey,
+          model: ai.model || aiRewrite.DEFAULT_MODEL,
+        });
+        if (result.ok) {
+          rec.improvedPrompt = result.text;
+          rec.aiTailored = true;
+        } else {
+          rec.aiError = result.error;
+        }
+      } else {
+        rec.aiError = "No Claude API key set.";
+      }
+    }
+    return rec;
   });
 
   // The prompt the background watcher seeded the window with (one-shot).

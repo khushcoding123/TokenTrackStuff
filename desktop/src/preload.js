@@ -81,6 +81,12 @@ contextBridge.exposeInMainWorld("metriq", {
   getCaptureRepoUrl: () => ipcRenderer.invoke("settings:get-repo-url"),
   setCaptureRepoUrl: (url) => ipcRenderer.invoke("settings:set-repo-url", url),
 
+  // AI-tailored rewrite (Claude API key), used by the capture popup instead
+  // of the offline template when enabled.
+  getAiRewrite: () => ipcRenderer.invoke("settings:get-ai-rewrite"),
+  setAiRewrite: (patch) => ipcRenderer.invoke("settings:set-ai-rewrite", patch),
+  testAiKey: () => ipcRenderer.invoke("settings:test-ai-key"),
+
   // Terminal-agent capture (Phase 5b, metriq-wrap sessions).
   getTerminalWrap: () => ipcRenderer.invoke("settings:get-wrap"),
   setTerminalWrap: (enabled) => ipcRenderer.invoke("settings:set-wrap", enabled),

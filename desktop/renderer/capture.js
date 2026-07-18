@@ -18,6 +18,8 @@
   const filesWrap = document.getElementById("capture-files-wrap");
   const filesEl = document.getElementById("capture-files");
   const focusedEl = document.getElementById("capture-focused");
+  const aiBadgeEl = document.getElementById("capture-ai-badge");
+  const aiNoteEl = document.getElementById("capture-ai-note");
   const btnApply = document.getElementById("btn-apply");
   const btnCopy = document.getElementById("btn-copy");
   const btnClose = document.getElementById("btn-close");
@@ -29,6 +31,7 @@
   let debounceTimer = null;
   let latestImproved = "";
   let latestStats = null;
+  let runToken = 0;
 
   function shortRepo(url) {
     const m = String(url).match(/github\.com[/:]([^/]+\/[^/.]+)/i);
@@ -75,6 +78,14 @@
       savedPct: s.savedPct || 0,
       rating: a.rating,
     };
+
+    aiBadgeEl.classList.toggle("hidden", !rec.aiTailored);
+    if (rec.aiError) {
+      aiNoteEl.textContent = "AI rewrite unavailable — showing offline rewrite";
+      aiNoteEl.classList.remove("hidden");
+    } else {
+      aiNoteEl.classList.add("hidden");
+    }
   }
 
   function clearResult() {
@@ -84,7 +95,11 @@
   }
 
   async function run(prompt) {
+    // capture:recommend can now wait on an AI network round-trip, so a slow
+    // response to an earlier keystroke must not clobber a newer one.
+    const myRun = ++runToken;
     const rec = await window.metriq.recommendPrompt(prompt);
+    if (myRun !== runToken) return;
     renderResult(rec);
   }
 

@@ -965,6 +965,43 @@
                     <button id="btn-editorcapture" class="set-switch" role="switch" aria-checked="false" aria-label="Editor capture"></button>
                   </div>
                 </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /><circle cx="12" cy="12" r="4" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">AI-tailored rewrite</span>
+                      <span class="set-row-desc">
+                        Use your own Claude API key to tailor the rewrite to what you're actually
+                        asking, instead of the offline template.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="set-switch-control">
+                    <span id="airewrite-label" class="set-switch-state muted">Off</span>
+                    <button id="btn-airewrite" class="set-switch" role="switch" aria-checked="false" aria-label="AI-tailored rewrite"></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="set-repo-block">
+                <label class="set-row-title" for="ai-key-input">Claude API key</label>
+                <div class="set-repo-input-row">
+                  <input id="ai-key-input" class="set-input" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+                  <button id="btn-toggle-ai-key" type="button" class="ov-btn-secondary">Show</button>
+                </div>
+                <div class="set-repo-input-row" style="margin-top: var(--space-2);">
+                  <select id="ai-model-select" class="set-input"></select>
+                </div>
+                <div class="set-repo-input-row" style="margin-top: var(--space-2);">
+                  <button id="btn-save-ai-key" class="ov-btn-primary">Save</button>
+                  <button id="btn-test-ai-key" type="button" class="ov-btn-secondary">Test key</button>
+                </div>
+                <p id="ai-key-status" class="muted set-repo-status">Get a key at console.anthropic.com.</p>
               </div>
 
               <div class="set-repo-block">
@@ -995,6 +1032,13 @@
                 the field's contents — Metriq re-checks the field is unchanged immediately before
                 writing, but on a genuine timing race it's possible for an insert to land somewhere
                 unintended. Off by default; available on macOS only.
+              </p>
+              <p class="muted set-disclosure">
+                AI-tailored rewrite sends your draft prompt directly to Anthropic's API using the
+                key you provide — never through Metriq's own servers. The key is encrypted at rest
+                via your OS keychain, the same guarantee as your login session, and is never
+                displayed again after saving. Off by default, and always falls back to the offline
+                rewrite with no network call if disabled, unset, or unreachable.
               </p>
             </section>
 

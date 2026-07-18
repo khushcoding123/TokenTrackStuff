@@ -1457,6 +1457,76 @@
 
   initEditorCapture();
 
+  // --- AI-tailored rewrite (Claude API key) --------------------------------
+
+  const btnAiRewrite = document.getElementById("btn-airewrite");
+  const aiRewriteLabel = document.getElementById("airewrite-label");
+  const aiKeyInput = document.getElementById("ai-key-input");
+  const btnToggleAiKey = document.getElementById("btn-toggle-ai-key");
+  const aiModelSelect = document.getElementById("ai-model-select");
+  const btnSaveAiKey = document.getElementById("btn-save-ai-key");
+  const btnTestAiKey = document.getElementById("btn-test-ai-key");
+  const aiKeyStatus = document.getElementById("ai-key-status");
+
+  function renderAiRewrite(state) {
+    const on = Boolean(state.enabled);
+    aiRewriteLabel.textContent = on ? "On" : "Off";
+    btnAiRewrite.setAttribute("aria-checked", String(on));
+  }
+
+  function setAiKeyStatus(msg, kind = "muted") {
+    aiKeyStatus.textContent = msg;
+    aiKeyStatus.className = `set-repo-status ${kind === "muted" ? "muted" : kind}`;
+  }
+
+  async function initAiRewrite() {
+    if (!btnAiRewrite) return;
+    const state = await window.metriq.getAiRewrite();
+    renderAiRewrite(state);
+
+    aiModelSelect.innerHTML = "";
+    for (const m of state.models || []) {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = m.label;
+      aiModelSelect.append(opt);
+    }
+    aiModelSelect.value = state.model;
+    aiKeyInput.value = "";
+    aiKeyInput.placeholder = state.hasKey ? state.maskedKey : "sk-ant-...";
+    if (state.hasKey) setAiKeyStatus("Key saved. Paste a new one to replace it.");
+
+    btnAiRewrite.addEventListener("click", async () => {
+      const current = btnAiRewrite.getAttribute("aria-checked") === "true";
+      const result = await window.metriq.setAiRewrite({ enabled: !current });
+      renderAiRewrite(result);
+    });
+
+    btnToggleAiKey.addEventListener("click", () => {
+      const showing = aiKeyInput.type === "text";
+      aiKeyInput.type = showing ? "password" : "text";
+      btnToggleAiKey.textContent = showing ? "Show" : "Hide";
+    });
+
+    btnSaveAiKey.addEventListener("click", async () => {
+      const patch = { model: aiModelSelect.value };
+      if (aiKeyInput.value.trim()) patch.apiKey = aiKeyInput.value.trim();
+      const result = await window.metriq.setAiRewrite(patch);
+      renderAiRewrite(result);
+      aiKeyInput.value = "";
+      aiKeyInput.placeholder = result.hasKey ? result.maskedKey : "sk-ant-...";
+      setAiKeyStatus(result.hasKey ? "Saved." : "No key set — falling back to the offline rewrite.", "ok");
+    });
+
+    btnTestAiKey.addEventListener("click", async () => {
+      setAiKeyStatus("Testing…");
+      const result = await window.metriq.testAiKey();
+      setAiKeyStatus(result.ok ? "Key works. You're set." : `Key check failed: ${result.error || "unknown error"}`, result.ok ? "ok" : "err");
+    });
+  }
+
+  initAiRewrite();
+
   // Shared by the Projects page's "Link a project" button and the Overview
   // empty state's "Connect a project" CTA. Errors render in the Projects
   // page's alert, so a failure from Overview also navigates there — the
