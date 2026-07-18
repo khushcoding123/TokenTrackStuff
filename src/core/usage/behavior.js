@@ -156,24 +156,37 @@ function analyzeWaste(turns) {
   );
   const wastedByIntent = new Map();
 
-  function recordWaste(bucketKey, turn, tokens) {
-    const amount = Math.max(0, Math.round(tokens || 0));
-    if (!amount) return;
-    buckets[bucketKey].tokens += amount;
+  // Record one wasteful event into a bucket (a single row + turn on the chart)
+  // and attribute its tokens to one or more intents (for the per-intent
+  // useful/wasted split). `attributions` is [{ intent, tokens }, ...] — the
+  // bucket counts the full sum as ONE wasteful turn, but the tokens can span
+  // intents (e.g. rework includes the previous turn's discarded output, which
+  // belongs to that earlier turn's intent, not the correction's).
+  function recordWaste(bucketKey, attributions) {
+    let total = 0;
+    for (const { intent, tokens } of attributions) {
+      const amount = Math.max(0, Math.round(tokens || 0));
+      if (!amount) continue;
+      total += amount;
+      wastedByIntent.set(intent, (wastedByIntent.get(intent) || 0) + amount);
+    }
+    if (!total) return;
+    buckets[bucketKey].tokens += total;
     buckets[bucketKey].turns += 1;
-    wastedByIntent.set(
-      turn.intent,
-      (wastedByIntent.get(turn.intent) || 0) + amount
-    );
   }
 
   turns.forEach((turn, i) => {
     const prev = i > 0 ? turns[i - 1] : null;
 
     // 1. Rework: this turn corrects the previous one, so the previous turn's
-    //    output was thrown away and this turn re-does it.
+    //    output was thrown away and this turn re-does it. Attribute the
+    //    discarded output to the PREVIOUS turn's intent so the per-intent cap
+    //    downstream doesn't clip it against this (usually smaller) turn.
     if (turn.prompt && CORRECTION_RE.test(turn.prompt.trim())) {
-      recordWaste("rework", turn, turn.totalTokens + (prev ? prev.outputTokens : 0));
+      recordWaste("rework", [
+        { intent: turn.intent, tokens: turn.totalTokens },
+        ...(prev ? [{ intent: prev.intent, tokens: prev.outputTokens }] : []),
+      ]);
       return; // a correction turn isn't double-counted in other buckets
     }
 
@@ -184,14 +197,14 @@ function analyzeWaste(turns) {
       prev.prompt &&
       promptSimilarity(turn.prompt, prev.prompt) >= 0.8
     ) {
-      recordWaste("retries", turn, turn.totalTokens);
+      recordWaste("retries", [{ intent: turn.intent, tokens: turn.totalTokens }]);
       return;
     }
 
     // 3. Cache misses: past the first turn the conversation context already
     //    exists, so uncached input tokens are context re-sent at full price.
     if (i > 0 && turn.inputTokens > 0 && turn.cacheReadTokens > 0) {
-      recordWaste("uncachedContext", turn, turn.inputTokens);
+      recordWaste("uncachedContext", [{ intent: turn.intent, tokens: turn.inputTokens }]);
     }
 
     // 4. Vague exploration: a tiny unscoped prompt where input dwarfs output
@@ -206,7 +219,9 @@ function analyzeWaste(turns) {
       !FILE_REF_RE.test(turn.prompt) &&
       contextIn > turn.outputTokens * 4
     ) {
-      recordWaste("vagueExploration", turn, contextIn - turn.outputTokens * 4);
+      recordWaste("vagueExploration", [
+        { intent: turn.intent, tokens: contextIn - turn.outputTokens * 4 },
+      ]);
     }
   });
 
