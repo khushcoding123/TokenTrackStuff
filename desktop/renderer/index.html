@@ -923,6 +923,48 @@
                   </div>
                   <button type="button" id="autocapture-permission" class="set-permission-pill muted">Checking…</button>
                 </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m4 17 6-6-6-6M12 19h8" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Terminal agent capture</span>
+                      <span class="set-row-desc">
+                        For Claude Code / Codex run via <code>metriq-wrap</code>: detect the draft as you
+                        type and let approved rewrites be inserted directly into the terminal.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="set-switch-control">
+                    <span id="terminalwrap-label" class="set-switch-state muted">Off</span>
+                    <button id="btn-terminalwrap" class="set-switch" role="switch" aria-checked="false" aria-label="Terminal agent capture"></button>
+                  </div>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-row-left">
+                    <span class="set-row-icon">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 9v6M16 9v6M4 5h16v14H4z" />
+                      </svg>
+                    </span>
+                    <div class="set-row-text">
+                      <span class="set-row-title">Editor capture (Cursor / VS Code)</span>
+                      <span class="set-row-desc">
+                        macOS only. Detect the draft as you type in Cursor or VS Code's chat panel and
+                        insert an approved rewrite directly back in. Uses the accessibility permission.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="set-switch-control">
+                    <span id="editorcapture-label" class="set-switch-state muted">Off</span>
+                    <button id="btn-editorcapture" class="set-switch" role="switch" aria-checked="false" aria-label="Editor capture"></button>
+                  </div>
+                </div>
               </div>
 
               <div class="set-repo-block">
@@ -939,6 +981,20 @@
                 Code, or a terminal, and a small popup shows a focused rewrite to paste back. It
                 ignores copies from other apps, reads only your clipboard locally, and never
                 records your screen.
+              </p>
+              <p class="muted set-disclosure">
+                Terminal agent capture is a separate, off-by-default mechanism: it only sees text
+                typed inside a session you explicitly start with <code>metriq-wrap claude</code> or
+                <code>metriq-wrap codex</code> — nothing outside that terminal session, no screen
+                reading, no OS permission required. See the desktop README for setup.
+              </p>
+              <p class="muted set-disclosure">
+                Editor capture reads only the currently-focused text field in Cursor/VS Code via the
+                macOS accessibility API (not a screenshot or screen recording), and only while that
+                app is frontmost. Inserting a rewrite brings the app to the foreground and replaces
+                the field's contents — Metriq re-checks the field is unchanged immediately before
+                writing, but on a genuine timing race it's possible for an insert to land somewhere
+                unintended. Off by default; available on macOS only.
               </p>
             </section>
 

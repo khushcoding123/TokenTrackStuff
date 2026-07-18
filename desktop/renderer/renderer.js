@@ -1398,6 +1398,65 @@
 
   initAutoCapture();
 
+  // --- Terminal agent capture (Phase 5b, metriq-wrap sessions) ------------
+
+  const btnTerminalWrap = document.getElementById("btn-terminalwrap");
+  const terminalWrapLabel = document.getElementById("terminalwrap-label");
+
+  function renderTerminalWrap(state) {
+    const on = Boolean(state.enabled);
+    terminalWrapLabel.textContent = on ? "On" : "Off";
+    btnTerminalWrap.setAttribute("aria-checked", String(on));
+  }
+
+  async function initTerminalWrap() {
+    if (!btnTerminalWrap) return;
+    renderTerminalWrap(await window.metriq.getTerminalWrap());
+
+    btnTerminalWrap.addEventListener("click", async () => {
+      const current = btnTerminalWrap.getAttribute("aria-checked") === "true";
+      const result = await window.metriq.setTerminalWrap(!current);
+      renderTerminalWrap(result);
+    });
+  }
+
+  initTerminalWrap();
+
+  // --- GUI editor capture (Phase 5a, Cursor/VS Code, macOS only) ----------
+
+  const btnEditorCapture = document.getElementById("btn-editorcapture");
+  const editorCaptureLabel = document.getElementById("editorcapture-label");
+
+  function renderEditorCapture(state) {
+    if (!state.available) {
+      editorCaptureLabel.textContent = "macOS only";
+      btnEditorCapture.setAttribute("aria-checked", "false");
+      btnEditorCapture.disabled = true;
+      return;
+    }
+    const on = Boolean(state.enabled);
+    editorCaptureLabel.textContent = on ? "On" : "Off";
+    btnEditorCapture.setAttribute("aria-checked", String(on));
+  }
+
+  async function initEditorCapture() {
+    if (!btnEditorCapture) return;
+    renderEditorCapture(await window.metriq.getEditorCapture());
+
+    btnEditorCapture.addEventListener("click", async () => {
+      const current = btnEditorCapture.getAttribute("aria-checked") === "true";
+      const result = await window.metriq.setEditorCapture(!current);
+      if (result.ok) {
+        renderEditorCapture(await window.metriq.getEditorCapture());
+      } else if (result.permission) {
+        renderEditorCapture({ available: true, enabled: false });
+        await window.metriq.openPermissionSettings("accessibility");
+      }
+    });
+  }
+
+  initEditorCapture();
+
   // Shared by the Projects page's "Link a project" button and the Overview
   // empty state's "Connect a project" CTA. Errors render in the Projects
   // page's alert, so a failure from Overview also navigates there — the

@@ -1,160 +1,174 @@
-# Phase 5 proposal: live screen/context awareness
+# Phase 5 proposal (v2): live capture across GUI + terminal agents, with auto-insert
 
 **Status: proposal only, not approved, nothing in this doc is implemented.**
 Per the desktop-app pivot spec, Phase 5 is explicitly gated behind review and
-approval of this document before any code is written.
+approval of this document before any code is written. This is a revision of
+the original Phase 5 doc — v1's scope (macOS, VS Code/Cursor, read-only) is
+folded in below, extended to cover the two gaps that were out of scope
+before: **terminal-based CLI agents (Claude Code, Codex)** and
+**auto-insert write-back**, per request.
 
-## The ambition
+## What exists today (Phase 4, shipped, no OS permissions needed)
 
-Right now (Phase 4), Metriq only sees a prompt if the user manually pastes or
-types it into the capture window. The "scan the screen automatically" version
-would have Metriq notice what the user is drafting in Claude, ChatGPT, Cursor,
-or VS Code without that manual step. This document assesses what's actually
-feasible, what it costs, and what a defensible first version looks like.
+The capture popup is already cross-tool in one specific sense: it triggers on
+**clipboard content**, not on screen contents. `desktop/src/main.js`'s
+`clipboardPromptSource()` polls `clipboard.readText()`, checks it against
+`looksLikePrompt()` and a foreground-app allowlist (`CODING_APPS`, which
+already includes terminal emulators — `wt`, `alacritty`, `iterm`, etc.), and
+pops the suggestion window. Because the trigger is "you copied something,"
+this already works today for Claude Code/Codex: **copy your draft prompt
+before submitting it, and the popup appears with the rewrite** — same flow
+as VS Code/Cursor. Output only ever goes back out via clipboard
+(`capture:apply` writes to it); you paste it yourself. There is no reading of
+un-copied screen/window content and no write-back into the source app.
 
-## Two fundamentally different problems
+`desktop/src/prompt-watcher.js` was deliberately built with the real reader
+as a pluggable `source()` function precisely so this doc's outcome can drop
+in without touching the watcher's debounce/dedupe/emit logic.
 
-These aren't one feature with two platforms — they're two different technical
-problems with different privacy postures and different engineering cost.
+This proposal is about removing the **manual copy step** (auto-detect the
+draft as you type, before you hit enter) and **the manual paste step**
+(auto-insert the rewrite back into the source app) — for both GUI editors and
+terminal agents.
 
-### A. Native/Electron apps (VS Code, Cursor)
+## Four sub-problems, not one feature
 
-**Path: OS accessibility APIs.** Every desktop OS exposes an "accessibility
-tree" of running apps' UI (originally built for screen readers) that a
-permitted process can read — including the text content of a focused input
-field in another app.
+They have different technical mechanisms and different risk profiles. Do not
+treat them as a single on/off switch.
 
-- **macOS — `AXUIElement` (ApplicationServices).** The most mature path here.
-  Two implementation options:
-  - Shell out to AppleScript/JXA via `osascript` (e.g. `tell application
-    "System Events" to tell process "Cursor" to get value of text area 1 of
-    window 1`). No native compilation, callable from Electron's main process
-    via `child_process` today. This is genuinely the cheapest way to
-    prototype and validate whether this is even worth pursuing further.
-  - A native Node addon calling the AX API directly. More robust and
-    performant than shelling out, but real native-code engineering (Swift/
-    Obj-C or a C addon via node-gyp), a second toolchain to maintain, and
-    per-arch (Intel/Apple Silicon) build concerns.
-  - **Concrete gotcha specific to our actual targets:** VS Code and Cursor
-    are both Electron apps built on the Monaco editor. Chromium's own
-    accessibility tree exposure is often lazy — it may only fully populate
-    once a screen reader is detected, or once `editor.accessibilitySupport`
-    is explicitly set to `"on"` in VS Code/Cursor settings (it defaults to
-    `"auto"`). We would likely need to document a setup step ("enable
-    accessibility support in your editor") rather than have this work
-    silently out of the box — I haven't verified whether `"auto"` is
-    sufficient without a real screen reader running, and that needs to be
-    tested hands-on before committing to a design.
-- **Windows — UI Automation (UIA), COM-based.** Same shape of problem, no
-  direct analogue to `osascript` for a quick shell-based prototype, but
-  PowerShell + .NET's `System.Windows.Automation` namespace gets close (no
-  native compile needed for a prototype, same tradeoff as AppleScript).
-- **Linux — AT-SPI2, D-Bus based.** Works reasonably well on GNOME; spottier
-  and less consistent across other desktop environments. I'd treat Linux as
-  best-effort / lowest priority for this feature specifically.
+| # | Problem | Mechanism | Read confidence | Write confidence |
+|---|---|---|---|---|
+| 1 | Read draft from VS Code/Cursor (GUI) | OS accessibility tree | Medium — depends on `editor.accessibilitySupport`, unverified hands-on | N/A here |
+| 2 | Read draft from Claude Code/Codex (terminal) | PTY/stdin interception via a wrapper | High (once built) | N/A here |
+| 3 | Write rewrite back into VS Code/Cursor | AX `AXValue` set, or simulated select-all+paste | Medium-low — focus-stealing, selection races | Medium-low |
+| 4 | Write rewrite back into Claude Code/Codex | Inject into the same PTY the wrapper owns | High (once built) | High, but only for the specific case below |
 
-### B. Browser-based tools (Claude.ai, ChatGPT)
+### 1 & 3. GUI editors (VS Code, Cursor) — unchanged from v1
 
-**A desktop app cannot read another process's rendered DOM.** The browser is
-a sandboxed process; Metriq has no first-party way to see what's typed into a
-`claude.ai` or `chatgpt.com` tab. There are two real options, not one:
+**Read**, via macOS `AXUIElement` (prototype with `osascript`, as in the
+original doc), Windows UI Automation, Linux AT-SPI2 (best-effort). Still
+carries the same unverified assumption flagged in v1: Chromium/Monaco's AX
+tree may need `editor.accessibilitySupport` set explicitly, and this has not
+been tested hands-on.
 
-1. **Also via the OS accessibility tree**, if the browser has accessibility
-   mode engaged (browsers expose page content this way for screen readers,
-   and web apps' ARIA markup feeds it). This technically can work, but it's
-   fragile in a way native-app reading isn't: it depends on Claude/ChatGPT's
-   own DOM structure and ARIA labeling staying stable, which is entirely
-   outside our control and can silently break on any UI redesign of a
-   product we don't own.
-2. **A companion browser extension** (Manifest V3, so Chrome/Edge/Brave — the
-   spec's own framing, and the right one). A content script on the relevant
-   domains reads the actual prompt textarea's value directly — reliable,
-   first-party, not guessing through an accessibility tree. It then needs to
-   get that text to the desktop app, which means:
-   - **Chrome Native Messaging** (the standard, store-compliant pattern): the
-     extension talks to a native host process over stdio. Requires
-     registering a native-messaging-host manifest at an OS-specific path
-     during install (e.g. `~/Library/Application Support/Google/Chrome/
-     NativeMessagingHosts/` on macOS) — real installer work, but no open
-     network port.
-   - **A localhost WebSocket/HTTP server** in the Electron app instead: much
-     simpler to build, but it's a locally-listening port that, without a
-     pairing/auth token issued at install time, any other local process
-     could in principle connect to. Doable, but needs that token-based
-     pairing to be secure, not just "trust localhost."
+**Write-back (new in this revision).** Two options, neither clean:
+- **Set `AXValue` directly** on the focused text element. Where supported,
+  this is the safest write path (no keystroke simulation, no focus theft),
+  but Monaco's AX exposure for *setting* value (vs. reading it) is even less
+  proven than reading — this needs the same `osascript` prototyping pass
+  before it's trusted.
+- **Simulate select-all + paste** (`Cmd+A` then `Cmd+V` via `osascript
+  keystroke`, with the rewrite pre-loaded on the clipboard). Works more
+  reliably across apps but is meaningfully riskier: it requires bringing the
+  target window to the foreground (focus-stealing — a real UX interruption,
+  not silent), and it blindly overwrites *whatever is currently selected*.
+  If the user's cursor moved between when we read the draft and when we
+  write back (a few hundred ms of polling latency, plus think-time), this
+  can silently replace the wrong text or a different file's content. This is
+  the single riskiest part of the whole proposal — a misfire here doesn't
+  just show a bad suggestion, it corrupts what the user was writing.
 
-Building and maintaining a browser extension (plus Chrome Web Store review if
-we ever want it publicly installable, not just side-loaded) is a real second
-project, not a small add-on to the desktop app.
+**Recommendation:** for GUI editors, ship read-only auto-detect first (no
+more manual copy). Do not ship write-back for GUI editors in v1 — the
+selection-race risk above is a real "did it just eat my code" failure mode,
+and it needs its own validation pass (e.g. a checksum-verify-before-write:
+re-read the field immediately before writing and abort if it changed from
+what was analyzed) that's out of scope to design blind.
 
-## Permissions, per platform
+### 2 & 4. Terminal agents (Claude Code, Codex) — new in this revision
 
-| Platform | Permission | Notes |
-|---|---|---|
-| macOS | **Accessibility** (System Settings → Privacy & Security → Accessibility) | Required for AX-tree reading of other apps. Can be triggered via Electron's `systemPreferences.isTrustedAccessibilityClient(true)`, which also surfaces the OS prompt. Often needs an app restart after the user grants it. |
-| macOS | **Screen Recording** | Only needed if we ever do pixel-level screenshot capture (i.e., for OCR — see below). Not needed for AX-tree text reading. Also cannot be silently pre-approved; user must toggle it manually. |
-| Windows | None comparable | Traditional desktop apps calling UIA don't hit a user-facing permission dialog the way macOS Accessibility does — a materially different security/consent posture, worth being explicit with users about even though the OS doesn't force it. |
-| Linux | Varies | Generally no centralized permission-prompt system; depends on whether accessibility services are enabled at the OS/DE level. |
+This is a genuinely different problem from GUI editors, not a variant of it.
+**A terminal has no structured "input field" for AX to read.** Terminal
+emulators (Terminal.app, iTerm2, Windows Terminal, the VS Code/Cursor
+integrated terminal) expose their content to accessibility APIs as one flat
+block of rendered text — the whole scrollback, undifferentiated. There is no
+"the user is currently typing here" element the way a native text field
+provides. Trying to extract "just the current input line" by diffing
+scrollback text against a shell prompt regex is a real heuristic and will
+break on ANSI control sequences, multi-line prompts, and Claude Code/Codex's
+own TUI redraws (both render an interactive box UI, not a plain readline
+prompt) — I would not trust AX reading for terminals; it belongs in the same
+"not worth it" bucket the original doc put OCR in.
 
-Whatever we build, this must be an explicit, off-by-default toggle in
-Settings (per the spec's own privacy requirement), with plain-language copy
-about exactly what gets read and when, and a visible indicator whenever the
-feature is actively engaged — never a silent background capability.
+**The mechanism that actually works reliably here is different: a shell
+wrapper around the `claude` / `codex` binaries**, not screen reading at all.
 
-## Is OCR-on-screenshot worth it as a fallback?
+- The user installs a thin wrapper (e.g. metriq ships a `claude` /`codex`
+  shell function or a PTY-proxy binary that the user opts into via `metriq
+  wrap claude`, or a one-line addition to their shell rc). The wrapper spawns
+  the real CLI inside a pseudo-TTY (`node-pty` or Python's `pty` module) that
+  Metriq's desktop app controls, and passes keystrokes through transparently
+  — except it can also read the input buffer being typed (before Enter) and,
+  on request, **inject text directly into that same PTY**, which is
+  indistinguishable from the user typing it.
+- This means auto-insert here is *not* a selection-race guess like the GUI
+  case — Metriq owns the actual input stream, so "replace the draft with the
+  rewrite" is a clean, well-defined operation (clear the current input line,
+  write the new text), not a blind keystroke simulation aimed at whatever
+  happens to be focused.
+- **Cost/risk is different, not lower.** This is a new piece of
+  infrastructure (a PTY proxy, likely `node-pty`, which is a native module —
+  breaks the "zero native deps outside what's already in desktop/" comfort
+  zone) that sits directly in the critical path of the user's actual coding
+  session. A bug here doesn't just misfire a suggestion — it can eat
+  keystrokes, break terminal resizing/redraw, or hang the wrapped process.
+  It needs its own opt-in (`metriq wrap claude`), its own fallback (if the
+  wrapper crashes, it must transparently fall through to the real binary,
+  never block the user from running their CLI tool), and cannot piggyback on
+  the AX-permission work for GUI editors — it's a separate build.
+- This approach only works for terminal agents Metriq explicitly wraps
+  (`claude`, `codex` today). It does not generalize to "any terminal
+  content" the way AX reading conceptually could for GUI apps.
 
-For apps with no accessibility hooks at all, the fallback is: take a
-screenshot, run OCR, extract text. My assessment: **not worth it, at least
-not for v1.**
+**Recommendation:** build this as its own workstream, not bundled with the
+GUI-editor AX work. It's higher engineering cost than GUI read+write
+combined, but it's also the *only* one of the four sub-problems where
+auto-insert is actually safe to ship, because Metriq owns the input stream
+instead of guessing at screen state.
 
-- **Accuracy risk is specifically bad for our use case.** OCR on
-  syntax-highlighted, monospaced code — mixed fonts, thin whitespace-
-  sensitive indentation, easily-confused characters (`l`/`1`/`I`, `0`/`O`) —
-  is meaningfully less reliable than on plain prose. Metriq's entire value
-  proposition depends on accurately reading the user's actual prompt text;
-  a misread token count or a mangled rewrite from bad OCR actively damages
-  trust in the product, worse than just not having the feature.
-- **A local-only OCR path does exist** (macOS Vision framework's
-  `VNRecognizeTextRequest`, Windows' `Windows.Media.Ocr` — both on-device, no
-  cloud call, consistent with our "nothing leaves the device" privacy
-  principle), so this isn't a privacy blocker. But it's yet another
-  platform-specific native integration stacked on top of the AX-API one,
-  compounding the engineering surface for a fallback whose accuracy is
-  already in question.
-- **Recommendation:** skip OCR entirely for the first version. Revisit only
-  if real usage shows AX-tree coverage is insufficient for the apps people
-  actually use, and only then decide if the accuracy tradeoff is worth it
-  for whichever specific gap it would fill.
+## Permissions, updated
 
-## Recommended minimal version
+Same table as v1 (macOS Accessibility permission for AX reading; Windows/
+Linux have no comparable prompt) for sub-problems 1 & 3. Sub-problems 2 & 4
+need **no OS accessibility permission at all** — the wrapper is a normal
+child process the user explicitly launches — but do need clear, explicit
+opt-in per the same privacy posture (a visible "Metriq is wrapping this
+session" indicator any time the wrapper is active, and an easy one-command
+way to stop wrapping).
 
-Given the above, if this gets approved, I'd scope a first version as:
+## Recommended scoped v1 (revised)
 
-1. **macOS only.** Best tooling path (AppleScript/JXA needs no native
-   compile), and skews toward where the target audience already is.
-2. **Accessibility-tree reading only** — no OCR, no Screen Recording
-   permission requested at all in v1.
-3. **VS Code and Cursor only** (both native/Electron, both AX-reachable in
-   principle) — not Claude.ai/ChatGPT web. Ship something that reliably
-   works for two real tools rather than something flaky across four.
-4. **Prototype via `osascript` shell-out first**, not a native addon —
-   cheapest way to prove the concept actually works reliably against real
-   Monaco-editor windows before investing in native code. This is also the
-   point where we'd learn empirically whether the `editor.accessibilitySupport`
-   setting is actually a blocker in practice.
-5. **Explicit opt-in toggle**, clear copy, visible "currently reading" state
-   whenever engaged.
+Given the above, if this gets approved, I'd split it into two independently
+shippable pieces rather than one Phase 5:
 
-**Explicitly out of scope for v1, revisit later:** Windows/Linux support,
-Claude.ai/ChatGPT browser reading (the companion-extension project), and OCR.
-The browser-extension path in particular is a separable, comparably-sized
-second project on its own — it shouldn't gate shipping the native-app version.
+**5a — GUI auto-detect, read-only.** macOS only, VS Code/Cursor only,
+AX-tree reading, **no write-back**. Removes the manual-copy step for GUI
+editors. Prototype via `osascript` first, same as v1's plan.
+
+**5b — Terminal wrapper, read + safe write.** `claude` and `codex` only,
+via an opt-in shell wrapper (`node-pty`-based PTY proxy). Because Metriq
+owns the input stream, this is the one piece where auto-insert is safe to
+build, with a mandatory transparent-fallback requirement (wrapper failure
+must never block the underlying CLI).
+
+**Still explicitly out of scope:** GUI write-back (selection-race risk needs
+its own design, not blind approval alongside everything else), Claude.ai/
+ChatGPT browser reading (unchanged from v1 — separate companion-extension
+project), OCR (unchanged from v1 — rejected), Windows/Linux AX (best-effort
+later, not v1).
 
 ## What I need from you
 
-- Approval (or a different scope) for the "macOS + VS Code/Cursor + AX-tree
-  only, no OCR, no browser extension" v1 described above, before any of this
-  gets implemented.
-- If approved, I'd start with the `osascript` prototype specifically to
-  validate real Monaco-editor readability before writing a line of it into
-  the actual app.
+Approval, or a different scope, on:
+1. Whether to build **5a and 5b both**, or start with just one.
+2. For 5b: whether shipping a native module (`node-pty`) inside `desktop/`
+   is acceptable, given it's the one piece of this app with real runtime
+   dependencies already, but this is a native compiled addon, a different
+   category from the npm packages currently in `desktop/package.json`.
+3. Confirmation that GUI write-back (the selection-race risk under "1 & 3")
+   stays out of scope until it has its own follow-up design — I don't think
+   it should be waved through as part of a bundle.
+
+If approved, I'd start with whichever of 5a/5b is greenlit, prototyping via
+`osascript` (5a) or a minimal `node-pty` spike outside the app (5b) before
+writing anything into the real app.

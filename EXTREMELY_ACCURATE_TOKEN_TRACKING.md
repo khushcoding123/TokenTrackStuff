@@ -1,3 +1,4 @@
+
 # Extremely Accurate Token Tracking
 
 This guide is for an AI agent working on metriq. Its job is to explain how to

@@ -96,12 +96,45 @@ next starts. Status:
   Studio page (see below) — on a
   debounced keystroke, with one-click copy to clipboard. No screen/window
   reading of other apps.
-- 📄 **Phase 5 (proposal only, not approved):** see
-  `docs/phase5-screen-awareness-proposal.md`. Recommends, if approved:
-  macOS-only, accessibility-tree reading only (no OCR, no browser
-  extension), VS Code/Cursor only, prototyped via `osascript` shell-out
-  before any native code. **Do not implement anything from that document
-  without explicit approval of its scope first.**
+- **Phase 5 (screen/context awareness):** see
+  `docs/phase5-screen-awareness-proposal.md` (v2). Split into two
+  independent pieces with different approval status:
+  - ✅ **5b (terminal agents, approved + built):** `metriq-wrap` — an opt-in
+    shell wrapper (`desktop/bin/metriq-wrap.js` → `desktop/src/pty-wrapper.js`,
+    `node-pty`-based) around `claude`/`codex` that tracks the current input
+    line and can insert an approved rewrite directly back into the terminal.
+    No OS accessibility permission needed — the wrapper is a process the
+    user explicitly launches, not a cross-app screen read. Talks to the
+    desktop app over a local socket at `~/.metriq/wrap.sock`
+    (`desktop/src/wrap-server.js`, wire protocol in
+    `desktop/src/wrap-protocol.js`) using the same capture-popup seeding
+    path as the clipboard watcher (`seedSource: "wrap"` in `main.js` is what
+    makes `capture:apply` eligible to insert-back instead of clipboard-only).
+    Verify-before-write: an insert is dropped if the user kept typing after
+    the draft was analyzed. See `desktop/README.md` for setup. **Explicitly
+    out of scope even for 5b:** auto-submitting (Enter is never sent), and
+    anything beyond `claude`/`codex`.
+  - ✅ **5a (VS Code/Cursor, macOS only, approved + built, read + write-back):**
+    `desktop/src/mac-ax.js` — `osascript`/`AXFocusedUIElement` reads whatever
+    text field is currently focused in Cursor/VS Code (no manual AX-tree
+    traversal needed; that attribute already resolves to "the field the user
+    is typing into right now"). Polled by `macEditorPromptSource()` /
+    `getEditorWatcher()` in `main.js` (`seedSource: "editor"`), same
+    capture-popup seeding path as 5b/clipboard. Write-back on approval was
+    explicitly accepted as a real, reduced-not-eliminated risk (the original
+    proposal's selection-race concern): Metriq doesn't own the editor's
+    input stream the way 5b's terminal wrapper does, so an insert is a
+    simulated select-all+paste into whatever's currently focused. Two
+    mitigations, not a full guarantee — `mac-ax.js` checks the focused
+    element's AXRole is actually text-input-like, and re-reads its value
+    immediately before writing to confirm it still matches what was
+    analyzed (`writeBack()`'s verify-before-write, aborts on mismatch). Gated
+    behind the same macOS Accessibility permission auto-capture already
+    uses (`permissions.js`). See `desktop/README.md` for setup/risk
+    disclosure shown to users.
+  - Still out of scope entirely: Claude.ai/ChatGPT browser capture (a
+    separate companion-extension project) and OCR (rejected in the
+    proposal on accuracy grounds).
 - ✅ **Usage/insights tracking:** `src/core/usage/` (aggregate, claude, codex,
   pricing, insights) reads local Claude Code + Codex session logs and
   prices/aggregates them — shared by `metriq trace` (CLI) and the desktop
@@ -368,8 +401,11 @@ If a deploy comes back BLOCKED, check the commit author email first.
 - Keep the CLI usable with no network and no config — it's a secondary
   interface now, but it still has to work standalone.
 - Work the desktop-app pivot phase by phase; don't jump ahead to a phase
-  that hasn't been reviewed, and don't start Phase 5 (screen/context
-  awareness) implementation without an approved written proposal first.
+  that hasn't been reviewed. Phase 5b (terminal-agent capture via
+  `metriq-wrap`) and Phase 5a (VS Code/Cursor GUI capture + write-back,
+  macOS only) are both approved and built — see "Product phases" above.
+  Still out of scope without a fresh explicit approval: Claude.ai/ChatGPT
+  browser capture, Windows/Linux AX hardening beyond basic support, and OCR.
 - Desktop app changes should be verified with a real Electron launch, not
   just `node --check`. Playwright's `_electron` API can drive it headlessly
   (`electron.launch({ executablePath: require("desktop/node_modules/

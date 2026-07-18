@@ -81,6 +81,14 @@ contextBridge.exposeInMainWorld("metriq", {
   getCaptureRepoUrl: () => ipcRenderer.invoke("settings:get-repo-url"),
   setCaptureRepoUrl: (url) => ipcRenderer.invoke("settings:set-repo-url", url),
 
+  // Terminal-agent capture (Phase 5b, metriq-wrap sessions).
+  getTerminalWrap: () => ipcRenderer.invoke("settings:get-wrap"),
+  setTerminalWrap: (enabled) => ipcRenderer.invoke("settings:set-wrap", enabled),
+
+  // GUI editor capture (Phase 5a, Cursor/VS Code, macOS only).
+  getEditorCapture: () => ipcRenderer.invoke("settings:get-editor-capture"),
+  setEditorCapture: (enabled) => ipcRenderer.invoke("settings:set-editor-capture", enabled),
+
   getStatsSummary: () => ipcRenderer.invoke("stats:get-summary"),
 
   getUsage: (days, source) => ipcRenderer.invoke("usage:get", days, source),

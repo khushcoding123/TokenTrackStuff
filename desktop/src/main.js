@@ -13,6 +13,8 @@ const { optimize } = require("../../packages/core/rewrite.js");
 const { recommend } = require("../../packages/optimize/index.js");
 const permissions = require("./permissions");
 const { PromptWatcher, looksLikePrompt } = require("./prompt-watcher");
+const { WrapServer } = require("./wrap-server");
+const macAx = require("./mac-ax");
 // Same usage engine behind the web /usage dashboard and `metriq trace` — reads
 // this machine's real Claude Code + Codex logs (not the local capture-copy
 // stats in usage-stats.js above, which only track this app's own CTA clicks).
@@ -61,6 +63,10 @@ let promptWatcher = null;
 // When auto-capture detects a draft prompt, we stash it here and open the
 // capture window; the window's renderer pulls it via "capture:get-seeded".
 let seededPrompt = null;
+// Where the current seededPrompt came from — "wrap" is the only source
+// eligible for insert-back (see capture:apply below); clipboard/manual
+// sources stay clipboard-only, same as before Phase 5b.
+let seedSource = "clipboard";
 // The last improved prompt we put on the clipboard — so copying our own output
 // doesn't re-trigger the popup in a loop.
 let lastAppliedText = "";
@@ -136,6 +142,7 @@ function getWatcher() {
     promptWatcher = new PromptWatcher({ source: clipboardPromptSource, intervalMs: 1200 });
     promptWatcher.on("prompt", (prompt) => {
       seededPrompt = prompt;
+      seedSource = "clipboard";
       if (!captureWindow) {
         createCaptureWindow({ focus: false }); // passive side popup, doesn't steal focus
       } else {
@@ -145,6 +152,81 @@ function getWatcher() {
     });
   }
   return promptWatcher;
+}
+
+// --- Terminal-agent capture (Phase 5b): metriq-wrap sessions ---------------
+// Draft prompts from a wrapped `claude`/`codex` session (see
+// src/pty-wrapper.js) arrive via the local socket wrap-server.js owns and
+// are routed into the exact same popup as the clipboard path — the only
+// difference is that a "wrap"-sourced suggestion can be sent back to the
+// terminal on approval (see capture:apply), instead of clipboard-only.
+let wrapServer = null;
+
+function getWrapServer() {
+  if (!wrapServer) {
+    wrapServer = new WrapServer();
+    wrapServer.on("draft", ({ text }) => {
+      seededPrompt = text;
+      seedSource = "wrap";
+      if (!captureWindow) {
+        createCaptureWindow({ focus: false });
+      } else {
+        captureWindow.webContents.send("capture:seed", text);
+      }
+    });
+  }
+  return wrapServer;
+}
+
+// --- GUI editor capture (Phase 5a): Cursor / VS Code, macOS only -----------
+// Polls the OS accessibility tree (via src/mac-ax.js) for the value of
+// whatever text field is currently focused in Cursor or VS Code — this is
+// how the popup can appear as you type a draft, with no manual copy step.
+// Write-back on approval is real here (unlike Phase 5b's terminal wrapper,
+// Metriq does NOT own the input stream for a GUI app — see mac-ax.js's
+// writeBack() for the verify-before-write safety check this relies on, and
+// docs/phase5-screen-awareness-proposal.md for why this is accepted as a
+// real, if reduced, risk rather than eliminated).
+let editorWatcher = null;
+// Which process the current "editor"-sourced seed came from, and the exact
+// text it was read as — both required to route a write-back to the right
+// app and to let mac-ax.js's verify-before-write check do its job.
+let editorAppProcess = null;
+let editorDraftText = "";
+let lastEditorValue = "";
+
+async function macEditorPromptSource() {
+  if (!macAx.isSupported()) return "";
+  const frontmost = macAx.getFrontmostProcessName();
+  if (!frontmost) return "";
+  const isEditor = Object.values(macAx.EDITOR_PROCESSES).includes(frontmost);
+  if (!isEditor) return "";
+
+  const focused = macAx.readFocused(frontmost);
+  if (!focused || !macAx.isTextRole(focused.role)) return "";
+  if (focused.value === lastEditorValue) return ""; // unchanged since last poll
+  lastEditorValue = focused.value;
+  if (!looksLikePrompt(focused.value)) return "";
+
+  editorAppProcess = frontmost;
+  return focused.value;
+}
+
+function getEditorWatcher() {
+  if (!editorWatcher) {
+    editorWatcher = new PromptWatcher({ source: macEditorPromptSource, intervalMs: 1500 });
+    editorWatcher.on("prompt", (prompt) => {
+      seededPrompt = prompt;
+      seedSource = "editor";
+      editorDraftText = prompt;
+      if (!captureWindow) {
+        createCaptureWindow({ focus: false });
+      } else {
+        captureWindow.webContents.send("capture:seed", prompt);
+      }
+    });
+  }
+  return editorWatcher;
 }
 
 // --- Protocol registration ---------------------------------------------
@@ -268,6 +350,13 @@ if (process.env.METRIQ_E2E_TEST === "1") {
   // end-to-end auto-capture -> popup flow can be exercised without a real
   // cross-app reader.
   global.__metriqTest.feedPrompt = (prompt) => getWatcher().feed(prompt);
+  // Same idea for Phase 5b: simulate a metriq-wrap draft without a real PTY.
+  global.__metriqTest.feedWrapDraft = (text) => getWrapServer().emit("draft", { text });
+  // Same idea for Phase 5a: simulate a GUI-editor draft without real AX/osascript.
+  global.__metriqTest.feedEditorDraft = (text, processName) => {
+    editorAppProcess = processName || "Cursor";
+    getEditorWatcher().emit("prompt", text);
+  };
 }
 
 function createTray() {
@@ -440,6 +529,23 @@ if (!gotSingleInstanceLock) {
       }
     }
 
+    // Resume the terminal-wrap socket if the user left it on. No OS
+    // permission gate here — metriq-wrap is an explicitly-launched local
+    // process, not a cross-app accessibility read.
+    if (loadPrefs().terminalWrap) {
+      getWrapServer().start();
+    }
+
+    // Resume GUI editor capture (Phase 5a, macOS only) if left on — same
+    // Accessibility permission gate as auto-capture, since it's the same
+    // OS API.
+    if (loadPrefs().editorCapture && macAx.isSupported()) {
+      const status = permissions.getPermissionStatus();
+      if (status.accessibility === "granted") {
+        getEditorWatcher().start();
+      }
+    }
+
     // Windows/Linux cold start via protocol link: the URL is a plain argv
     // entry on this very first launch.
     maybeHandleArgv(process.argv);
@@ -456,6 +562,8 @@ if (!gotSingleInstanceLock) {
 
   app.on("will-quit", () => {
     globalShortcut.unregisterAll();
+    wrapServer?.stop();
+    editorWatcher?.stop();
   });
 
   ipcMain.handle("app:get-capture-hotkey", () => CAPTURE_HOTKEY);
@@ -762,6 +870,46 @@ if (!gotSingleInstanceLock) {
     return { ok: true, enabled: false };
   });
 
+  // --- Terminal-agent capture (Phase 5b) -----------------------------------
+  // No OS permission to gate — metriq-wrap is a process the user explicitly
+  // launches (`metriq-wrap claude`), not a cross-app accessibility read.
+
+  ipcMain.handle("settings:get-wrap", () => ({
+    enabled: loadPrefs().terminalWrap ?? false,
+    running: !!wrapServer?.server,
+    socketPath: require("./wrap-protocol").socketPath(),
+  }));
+
+  ipcMain.handle("settings:set-wrap", (_event, enabled) => {
+    savePrefs({ terminalWrap: !!enabled });
+    if (enabled) getWrapServer().start();
+    else wrapServer?.stop();
+    return { ok: true, enabled: !!enabled };
+  });
+
+  // --- GUI editor capture (Phase 5a): Cursor / VS Code, macOS only ---------
+
+  ipcMain.handle("settings:get-editor-capture", () => ({
+    available: macAx.isSupported(),
+    enabled: loadPrefs().editorCapture ?? false,
+    running: editorWatcher?.isRunning() ?? false,
+    permission: permissions.getPermissionStatus(),
+  }));
+
+  ipcMain.handle("settings:set-editor-capture", (_event, enabled) => {
+    if (!macAx.isSupported()) return { ok: false, enabled: false, reason: "unsupported-platform" };
+    if (enabled) {
+      const permission = permissions.ensureCapturePermission();
+      if (!permission.ok) return { ok: false, enabled: false, permission };
+      savePrefs({ editorCapture: true });
+      getEditorWatcher().start();
+      return { ok: true, enabled: true, permission };
+    }
+    savePrefs({ editorCapture: false });
+    editorWatcher?.stop();
+    return { ok: true, enabled: false };
+  });
+
   ipcMain.handle("settings:get-repo-url", () => loadPrefs().captureRepoUrl ?? "");
 
   ipcMain.handle("settings:set-repo-url", (_event, url) => {
@@ -861,17 +1009,34 @@ if (!gotSingleInstanceLock) {
   });
 
   // Approve -> apply the improved prompt.
-  // APPLY-BACK SEAM: writing text into the *other* app's chatbox needs OS-native
-  // keystroke / accessibility injection (Phase 5, gated). Today we place it on
-  // the clipboard for a one-keystroke paste and record the saving.
+  // APPLY-BACK: a "wrap"-sourced suggestion (Phase 5b, a metriq-wrap
+  // terminal session — see wrap-server.js) inserts cleanly because Metriq
+  // owns the actual input stream. A "editor"-sourced suggestion (Phase 5a,
+  // Cursor/VS Code via the OS accessibility tree — see mac-ax.js) does NOT
+  // have that guarantee: write-back there is a simulated select-all+paste
+  // into whatever's currently focused, gated by mac-ax.js's
+  // verify-before-write check (aborts if the field's value changed since
+  // the draft was analyzed) but still a real, accepted risk — see
+  // docs/phase5-screen-awareness-proposal.md. Both cases also always get
+  // the clipboard fallback.
   ipcMain.handle("capture:apply", (_event, text, stats) => {
     clipboard.writeText(text);
     lastAppliedText = text; // don't let our own output re-trigger the popup
+    let applied = "clipboard";
+    if (seedSource === "wrap" && wrapServer?.sendInsertToActive(text)) {
+      applied = "clipboard+terminal";
+    } else if (seedSource === "editor" && editorAppProcess) {
+      const result = macAx.writeBack(editorAppProcess, editorDraftText, text);
+      if (result.ok) {
+        applied = "clipboard+editor";
+        lastEditorValue = text; // don't re-trigger the watcher on our own write
+      }
+    }
     if (stats) {
       const activeProject = loadPrefs().activeProject;
       recordCapture({ ...stats, projectName: activeProject?.name ?? null });
     }
-    return { ok: true, applied: "clipboard" };
+    return { ok: true, applied };
   });
 
   // --- Usage stats (Overview / Sustainability pages) ---------------------

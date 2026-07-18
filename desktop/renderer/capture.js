@@ -103,8 +103,13 @@
   // × or Esc. Cross-app write-back is the gated seam, so this is clipboard-only.
   btnApply.addEventListener("click", async () => {
     if (!latestImproved) return;
-    await window.metriq.applyPrompt(latestImproved, latestStats);
-    btnApply.textContent = "Applied. Paste with ⌘/Ctrl+V";
+    const result = await window.metriq.applyPrompt(latestImproved, latestStats);
+    btnApply.textContent =
+      result?.applied === "clipboard+terminal"
+        ? "Inserted into terminal"
+        : result?.applied === "clipboard+editor"
+          ? "Inserted into editor"
+          : "Applied. Paste with ⌘/Ctrl+V";
     setTimeout(() => (btnApply.textContent = "Approve & apply"), 1600);
   });
 
