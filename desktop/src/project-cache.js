@@ -36,4 +36,40 @@ function removeFileIndex(projectId) {
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }
 
-module.exports = { saveFileIndex, loadFileIndex, removeFileIndex };
+// --- Typesense index metadata (Phase 2) -----------------------------------
+// Separate from the file index above: holds per-file content hashes (for
+// incremental re-indexing) plus the last index run's counts/status. Plain
+// JSON — file paths + hashes, no secrets. Kept in its own file so a plain
+// file-index read stays cheap and a large hash map doesn't bloat it.
+
+function indexMetaPath(projectId) {
+  return path.join(cacheDir(), `${projectId}.index.json`);
+}
+
+function saveIndexMeta(projectId, meta) {
+  fs.writeFileSync(indexMetaPath(projectId), JSON.stringify(meta), "utf8");
+}
+
+function loadIndexMeta(projectId) {
+  const p = indexMetaPath(projectId);
+  if (!fs.existsSync(p)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function removeIndexMeta(projectId) {
+  const p = indexMetaPath(projectId);
+  if (fs.existsSync(p)) fs.unlinkSync(p);
+}
+
+module.exports = {
+  saveFileIndex,
+  loadFileIndex,
+  removeFileIndex,
+  saveIndexMeta,
+  loadIndexMeta,
+  removeIndexMeta,
+};

@@ -1,15 +1,20 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog, globalShortcut, clipboard, screen } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const { execFile } = require("node:child_process");
 const { saveSession, loadSession, clearSession } = require("./auth-store");
 const { PROTOCOL, findProtocolUrlInArgv, parseAuthCallbackUrl } = require("./protocol");
-const { saveFileIndex, loadFileIndex, removeFileIndex } = require("./project-cache");
+const { saveFileIndex, loadFileIndex, removeFileIndex, saveIndexMeta, loadIndexMeta, removeIndexMeta } = require("./project-cache");
 const { loadPrefs, savePrefs } = require("./prefs");
 const { recordCapture, getSummary } = require("./usage-stats");
 const insforge = require("./insforge-client");
 const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scanner.js");
 const { optimize } = require("../../packages/core/rewrite.js");
+const typesense = require("./typesense-service");
+const codeIndexer = require("./code-indexer");
+const contextSearch = require("./context-search");
+const promptMemory = require("./prompt-memory");
 const { recommend } = require("../../packages/optimize/index.js");
 const permissions = require("./permissions");
 const { PromptWatcher, looksLikePrompt } = require("./prompt-watcher");
@@ -1072,4 +1077,5 @@ if (!gotSingleInstanceLock) {
     const d = USAGE_VALID_DAYS.has(days) ? days : 30;
     return buildUsagePayload(d, selectedSource || "claude-code");
   });
+
 }

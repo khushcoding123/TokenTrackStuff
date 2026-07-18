@@ -17,7 +17,7 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.75, ease: [0.16, 1, 0.3, 1] } },
 };
 
-export default function Hero({ winDownloadUrl, releasesUrl }) {
+export default function Hero({ winDownloadUrl, macDownloadUrl, releasesUrl }) {
   return (
     <motion.section
       variants={container}
@@ -57,8 +57,11 @@ export default function Hero({ winDownloadUrl, releasesUrl }) {
           Download for Windows
         </motion.a>
         {[
-          { os: "macOS", icon: "laptop_mac" },
-          { os: "Linux", icon: "dns" },
+          // macOS gets a direct asset download (same one-click behavior as
+          // Windows, so no new tab); Linux has no packaged asset yet, so it
+          // still points at the releases page.
+          { os: "macOS", icon: "laptop_mac", href: macDownloadUrl, direct: true },
+          { os: "Linux", icon: "dns", href: releasesUrl, direct: false },
         ].map((d) => (
           <motion.a
             key={d.os}
@@ -66,9 +69,8 @@ export default function Hero({ winDownloadUrl, releasesUrl }) {
             whileTap={{ scale: 0.97 }}
             transition={{ type: "spring", stiffness: 400, damping: 22 }}
             className="bg-primary/10 border border-primary text-primary px-6 py-3 rounded-lg font-label-md text-label-md flex items-center gap-2"
-            href={releasesUrl}
-            rel="noreferrer noopener"
-            target="_blank"
+            href={d.href}
+            {...(d.direct ? {} : { rel: "noreferrer noopener", target: "_blank" })}
           >
             <span className="material-symbols-outlined text-[18px]">{d.icon}</span>
             Download for {d.os}
