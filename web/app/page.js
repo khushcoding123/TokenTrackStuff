@@ -20,6 +20,10 @@ const RELEASES_URL = "https://github.com/khushcoding123/TokenTrackStuff/releases
 // asset with that exact filename — so publish the build named "Metriq-Windows.zip".
 const WIN_DOWNLOAD =
   "https://github.com/khushcoding123/TokenTrackStuff/releases/latest/download/Metriq-Windows.zip";
+// Same one-click pattern for the macOS installer — publish the build named
+// "Metriq.dmg" and this always resolves to the newest release's copy.
+const MAC_DOWNLOAD =
+  "https://github.com/khushcoding123/TokenTrackStuff/releases/latest/download/Metriq.dmg";
 
 export const metadata = { title: "Metriq focuses your prompts before you send them" };
 
@@ -64,7 +68,7 @@ export default async function LandingPage({ searchParams }) {
       </header>
 
       <main className="flex-1 relative z-10">
-        <Hero winDownloadUrl={WIN_DOWNLOAD} releasesUrl={RELEASES_URL} />
+        <Hero winDownloadUrl={WIN_DOWNLOAD} macDownloadUrl={MAC_DOWNLOAD} releasesUrl={RELEASES_URL} />
         <ProductPreview />
         <BeforeAfter />
         <HowItWorks />
