@@ -1,11 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Metriq — Prompt Optimizer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Detects any AI chatbot (ChatGPT, Claude, Gemini, Grok, Kimi, DeepSeek, Perplexity, and more), reads the prompt you're drafting, and rewrites it into a focused one — so you burn fewer tokens and hit usage limits less often.",
   "icons": { "128": "icons/icon-128.png" },
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.anthropic.com/*"],
+  "background": { "service_worker": "background.js" },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
   "action": {
-    "default_title": "Metriq — on an AI chatbot, click the ✦ button to optimize your prompt"
+    "default_title": "Metriq — click to open settings; on an AI chatbot use the ✦ button to optimize your prompt"
   },
   "content_scripts": [
     {

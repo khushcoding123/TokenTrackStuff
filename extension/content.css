@@ -68,6 +68,13 @@
 .metriq-moderate { background: rgba(250, 178, 25, 0.15) !important; color: #fab219 !important; }
 .metriq-broad { background: rgba(230, 103, 103, 0.15) !important; color: #e66767 !important; }
 
+.metriq-src {
+  font-size: 12px !important;
+  color: #4be277 !important;
+  margin-bottom: 10px !important;
+}
+.metriq-src-warn { color: #fab219 !important; }
+
 .metriq-save {
   font-size: 12px !important;
   color: #4be277 !important;
