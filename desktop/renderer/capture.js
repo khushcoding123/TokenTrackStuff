@@ -13,7 +13,7 @@
   const resultEl = document.getElementById("capture-result");
   const ratingEl = document.getElementById("capture-rating");
   const scoreEl = document.getElementById("capture-score");
-  const savingsEl = document.getElementById("capture-savings");
+  const issuesWrap = document.getElementById("capture-issues-wrap");
   const issuesEl = document.getElementById("capture-issues");
   const filesWrap = document.getElementById("capture-files-wrap");
   const filesEl = document.getElementById("capture-files");
@@ -22,7 +22,11 @@
   const aiNoteEl = document.getElementById("capture-ai-note");
   const btnApply = document.getElementById("btn-apply");
   const btnCopy = document.getElementById("btn-copy");
+  const btnCopyInline = document.getElementById("btn-copy-inline");
   const btnClose = document.getElementById("btn-close");
+
+  const CHECK_ICON =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>';
 
   // Show what the recommendation is scoped to (connected repo, if any).
   const repoUrl = await window.metriq.getCaptureRepoUrl();
@@ -43,16 +47,25 @@
 
     const a = rec.analysis || {};
     ratingEl.textContent = a.rating || "N/A";
-    ratingEl.className = `capture-badge rating-${a.rating || "moderate"}`;
-    scoreEl.textContent = `breadth ${a.breadthScore ?? 0}/100`;
+    ratingEl.className = "capture-badge-mono";
 
     const s = rec.tokenSaving || {};
-    savingsEl.textContent = s.savedTokens > 0 ? `saves ~${s.savedTokens} tokens (${s.savedPct}%)` : "";
+    scoreEl.textContent =
+      s.savedTokens > 0
+        ? `Breadth ${a.breadthScore ?? 0}/100 · Saves ~${s.savedTokens.toLocaleString()} tokens (${s.savedPct}%)`
+        : `Breadth ${a.breadthScore ?? 0}/100`;
 
     issuesEl.innerHTML = "";
-    for (const issue of (a.issues || []).slice(0, 2)) {
+    const issues = (a.issues || []).slice(0, 2);
+    issuesWrap.classList.toggle("hidden", issues.length === 0);
+    for (const issue of issues) {
       const li = document.createElement("li");
-      li.textContent = `• ${issue.message}`;
+      const icon = document.createElement("span");
+      icon.className = "capture-issue-icon";
+      icon.innerHTML = CHECK_ICON;
+      const text = document.createElement("span");
+      text.textContent = issue.message;
+      li.append(icon, text);
       issuesEl.append(li);
     }
 
@@ -142,20 +155,28 @@
         : result?.applied === "clipboard+editor"
           ? "Inserted into editor"
           : "Applied. Paste with ⌘/Ctrl+V";
-    setTimeout(() => (btnApply.textContent = "Approve & apply"), 1600);
+    setTimeout(() => (btnApply.textContent = "✦ Approve & apply"), 1600);
   });
 
-  btnCopy.addEventListener("click", async () => {
+  async function copyImproved(button) {
     if (!latestImproved) return;
     await window.metriq.copyToClipboard(latestImproved, latestStats);
-    btnCopy.textContent = "Copied!";
-    setTimeout(() => (btnCopy.textContent = "Copy"), 1200);
-  });
+    const original = button.textContent;
+    button.textContent = button === btnCopyInline ? "✓" : "Copied!";
+    setTimeout(() => (button.textContent = original), 1200);
+  }
+
+  btnCopy.addEventListener("click", () => copyImproved(btnCopy));
+  btnCopyInline.addEventListener("click", () => copyImproved(btnCopyInline));
 
   btnClose.addEventListener("click", () => window.metriq.closeCapture());
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") window.metriq.closeCapture();
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "w") {
+      e.preventDefault();
+      window.metriq.closeCapture();
+    }
   });
 
   // If the background watcher seeded a prompt, prefill and analyze immediately.

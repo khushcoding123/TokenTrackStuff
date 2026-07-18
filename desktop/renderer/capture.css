@@ -43,12 +43,28 @@
   min-width: 0;
 }
 
-.capture-context {
+.capture-context-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
-  max-width: 180px;
+  max-width: 200px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full, 999px);
+}
+
+.capture-context-pill #capture-context {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.capture-info-icon {
+  flex: 0 0 auto;
+  cursor: help;
+  font-size: 11px;
 }
 
 .capture-close {
@@ -67,6 +83,18 @@
 .capture-close:hover {
   background: var(--surface);
   color: var(--on-background);
+}
+
+.capture-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.capture-field-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .capture-input {
@@ -96,15 +124,43 @@
   flex: 1;
 }
 
-.capture-score-row {
+.capture-quality-row {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
-/* .capture-badge and its rating-* variants moved to the shared styles.css —
-   Prompt Studio (index.html) uses the same rating badge. */
+.capture-quality-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.capture-score-inline {
+  font-size: 11px;
+}
+
+/* Monochrome pill, deliberately not color-coded by rating — inverts with
+   the theme (on-background/background) rather than using --accent-primary,
+   so it stays a stark black/white chip in both light and dark mode. */
+.capture-badge-mono {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--on-background);
+  color: var(--background);
+}
+
+.capture-issues-card {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
 
 .capture-issues {
   list-style: none;
@@ -114,7 +170,25 @@
   color: var(--on-surface-variant);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+}
+
+.capture-issues li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.capture-issue-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  margin-top: 1px;
+}
+
+.capture-focused-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .capture-focused-label {
@@ -128,7 +202,6 @@
 
 .capture-ai-badge {
   text-transform: none;
-  color: var(--accent-primary);
   letter-spacing: normal;
   font-size: 11px;
 }
@@ -138,14 +211,37 @@
   margin-top: 2px;
 }
 
+.capture-focused-wrap {
+  position: relative;
+}
+
 .capture-focused {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px;
+  padding: 10px 40px 10px 10px;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.capture-copy-inline {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.capture-copy-inline:hover {
+  color: var(--on-background);
+  border-color: var(--on-background);
 }
 
 .capture-copy-btn {
@@ -201,6 +297,19 @@
 }
 
 .btn-secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--on-background);
+}
+
+/* Monochrome action buttons, matching the mono quality badge — deliberately
+   not the app's green --primary accent for this popup (see capture-badge-mono). */
+.btn-mono-primary {
+  background: var(--on-background);
+  color: var(--background);
+}
+
+.btn-mono-secondary {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--on-background);

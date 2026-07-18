@@ -16,49 +16,60 @@
       <div class="capture-header">
         <div class="brand">
           <div class="brand-mark brand-mark-sm">M</div>
-          <span class="brand-name brand-name-sm">Metriq</span>
+          <span class="brand-name brand-name-sm">Metriq Capture</span>
         </div>
         <div class="capture-header-right">
-          <span id="capture-context" class="capture-context muted">No repository connected</span>
+          <span class="capture-context-pill">
+            <span id="capture-context" class="muted">No repository connected</span>
+            <span class="capture-info-icon" title="Analysis is based on your prompt text only. Link a project or connect a repo to name real files.">ⓘ</span>
+          </span>
           <button id="btn-close" class="capture-close" aria-label="Close" title="Close (Esc)">×</button>
         </div>
       </div>
 
-      <textarea
-        id="capture-input"
-        class="capture-input"
-        placeholder="Paste or type the prompt you're about to send…"
-        autofocus
-      ></textarea>
+      <div class="capture-field">
+        <div class="capture-field-label muted">Your prompt</div>
+        <textarea
+          id="capture-input"
+          class="capture-input"
+          placeholder="Paste or type the prompt you're about to send…"
+          autofocus
+        ></textarea>
+      </div>
 
       <div id="capture-result" class="capture-result hidden">
-        <div class="capture-score-row">
-          <span id="capture-rating" class="capture-badge"></span>
-          <span id="capture-score" class="muted">breadth 0/100</span>
-          <span id="capture-savings" class="muted"></span>
+        <div class="capture-quality-row">
+          <span class="capture-quality-label muted">✦ Prompt quality:</span>
+          <span id="capture-rating" class="capture-badge-mono"></span>
+          <span id="capture-score" class="muted capture-score-inline"></span>
         </div>
 
-        <ul id="capture-issues" class="capture-issues"></ul>
+        <div id="capture-issues-wrap" class="capture-issues-card hidden">
+          <ul id="capture-issues" class="capture-issues"></ul>
+        </div>
 
         <div id="capture-files-wrap" class="capture-files-wrap hidden">
           <div class="capture-focused-label muted">Files to inspect first</div>
           <ul id="capture-files" class="capture-files"></ul>
         </div>
 
-        <div class="capture-focused-label muted">
-          Improved prompt
-          <span id="capture-ai-badge" class="capture-ai-badge hidden">✦ AI-tailored</span>
+        <div class="capture-focused-header">
+          <span class="capture-focused-label muted">Improved prompt</span>
+          <span id="capture-ai-badge" class="capture-ai-badge muted hidden">✦ AI improved</span>
         </div>
-        <div id="capture-focused" class="capture-focused"></div>
+        <div class="capture-focused-wrap">
+          <div id="capture-focused" class="capture-focused"></div>
+          <button id="btn-copy-inline" class="capture-copy-inline" aria-label="Copy improved prompt" title="Copy">⧉</button>
+        </div>
         <div id="capture-ai-note" class="muted capture-ai-note hidden"></div>
 
         <div class="capture-actions">
-          <button id="btn-apply" class="btn btn-primary">Approve &amp; apply</button>
-          <button id="btn-copy" class="btn btn-secondary">Copy</button>
+          <button id="btn-apply" class="btn btn-mono-primary">✦ Approve &amp; apply</button>
+          <button id="btn-copy" class="btn btn-mono-secondary">⧉ Copy</button>
         </div>
       </div>
 
-      <p class="capture-hint muted">Stays open · copy another prompt to refresh · Esc or × to close</p>
+      <p class="capture-hint muted">Stays open · Copy another prompt to refresh · Esc or ⌘+W to close</p>
     </div>
     <script src="capture.js"></script>
   </body>

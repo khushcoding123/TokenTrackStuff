@@ -11,6 +11,7 @@ const { recordCapture, getSummary } = require("./usage-stats");
 const insforge = require("./insforge-client");
 const { listSourceFiles, findRelevantFiles } = require("../../packages/core/scanner.js");
 const { optimize } = require("../../packages/core/rewrite.js");
+const { analyzePrompt } = require("../../packages/core/analyzer.js");
 const typesense = require("./typesense-service");
 const codeIndexer = require("./code-indexer");
 const contextSearch = require("./context-search");
@@ -1297,9 +1298,12 @@ if (!gotSingleInstanceLock) {
     }
 
     // Optional AI-tailored rewrite (see ai-rewrite.js): only ever overrides
-    // improvedPrompt on success. analysis/relevantFiles/tokenSaving stay the
-    // offline heuristic result either way; a failed/disabled AI call just
-    // leaves the heuristic improvedPrompt in place as the fallback.
+    // improvedPrompt on success. `analysis` (breadthScore/rating/issues) still
+    // describes the ORIGINAL prompt either way, so it stays valid regardless
+    // of which rewrite is shown. But `tokenSaving` describes the delta between
+    // the original and whatever is actually displayed as "Improved prompt" —
+    // that has to be recomputed against the real AI output, not left pointing
+    // at the (now-replaced, no-longer-shown) heuristic rewrite's numbers.
     const ai = loadPrefs().aiRewrite ?? {};
     if (ai.enabled) {
       const apiKey = aiKeyStore.loadApiKey();
@@ -1311,6 +1315,13 @@ if (!gotSingleInstanceLock) {
         if (result.ok) {
           rec.improvedPrompt = result.text;
           rec.aiTailored = true;
+          const before = analyzePrompt(prompt);
+          const after = analyzePrompt(result.text);
+          const savedTokens = Math.max(0, before.projectedTokens - after.projectedTokens);
+          rec.tokenSaving = {
+            savedTokens,
+            savedPct: before.projectedTokens > 0 ? Math.round((savedTokens / before.projectedTokens) * 100) : 0,
+          };
         } else {
           rec.aiError = result.error;
         }
